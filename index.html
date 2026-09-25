@@ -112,6 +112,8 @@
     #warehousePlan text{pointer-events:none}
     .zone-shape{fill:#18a5a744;stroke:#067d83;stroke-width:2.5;cursor:pointer;transition:fill .15s}
     .zone-shape:hover,.zone-shape.selected{fill:#12a3a777;stroke:#074e59;stroke-width:4}
+    .zone-shape.quarantine{fill:#f5ad3766;stroke:#aa6410}.zone-shape.quarantine:hover,.zone-shape.quarantine.selected{fill:#f5ad37aa;stroke:#87470a}
+    .zone-item.quarantine{border-color:#e7c183;background:#fffaf0}
     .dimension-label{font-size:13px;font-weight:800;fill:#163a50;stroke:#fff;stroke-width:5px;paint-order:stroke;pointer-events:none}
     .dimension-preview{stroke:#a96a10;stroke-width:2;stroke-dasharray:6 5;pointer-events:none}
     #mapDimensions,#mapMeasure{pointer-events:none}
@@ -141,6 +143,7 @@
     <nav class="tabs" aria-label="Secciones">
       <button class="tab active" type="button" data-view="stock" onclick="view('stock')">Existencias</button>
       <button class="tab" type="button" data-view="map" onclick="view('map')">Plano nave 9</button>
+      <button class="tab" type="button" data-view="quality" onclick="view('quality')">Cuarentena <span id="navQuarantine"></span></button>
       <button class="tab" type="button" data-view="moves" onclick="view('moves')">Movimientos <span id="navPending"></span></button>
       <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
       <button class="tab write" type="button" data-view="transfer" onclick="view('transfer')">Mover material</button>
@@ -165,6 +168,12 @@
         <p id="stockCount" class="count"></p>
         <div class="table-wrap"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Ubicación</th><th class="right">Disponible</th></tr></thead><tbody id="stockRows"></tbody></table></div>
         <div id="stockEmpty" class="empty" hidden><b>Sin resultados</b>Ajusta los filtros o registra una recepción.</div>
+      </div>
+    </section>
+    <section id="quality" hidden>
+      <div class="notice warning">⚑ <span>Material separado y bloqueado. Registra el motivo de la inmovilización y conserva el documento de entrada. Calidad revisa y documenta la decisión; hasta entonces no se puede usar ni enviar a obra.</span></div>
+      <div class="card panel"><div class="panel-top"><div><h2>Material pendiente de revisión</h2><p>La liberación registra quién decidió, cuánto liberó, el motivo y la zona de destino. Se puede liberar una parte.</p></div></div>
+        <div id="qualityRows"></div><div id="qualityEmpty" class="empty" hidden><b>Sin material inmovilizado</b>Dibuja una zona de cuarentena en el plano para poder registrar entradas separadas.</div>
       </div>
     </section>
     <section id="map" hidden>
@@ -195,6 +204,7 @@
             <label class="field"><span>Nombre *</span><input id="zoneName" oninput="markZoneDirty()" maxlength="80" placeholder="Tubería y accesorios"></label>
             <label class="field"><span>Categoría prevista *</span><input id="zoneCategory" oninput="markZoneDirty()" maxlength="80" placeholder="Conductos, tubería, pequeño material…"></label>
           </div>
+          <label id="zoneUseField" class="field" style="max-width:310px" hidden><span>Uso de la ubicación</span><select id="zoneUse" onchange="markZoneDirty()"><option value="ALMACEN">Almacenamiento normal</option><option value="CUARENTENA">Cuarentena · material bloqueado</option></select><small>El tipo queda fijado al crear la zona. La posición en el plano se elige al dibujarla.</small></label>
           <label class="field" style="max-width:280px"><span>Superficie útil medida en m²</span><input id="zoneArea" oninput="markZoneDirty()" type="number" inputmode="decimal" min="0.01" max="431.28" step="0.01" placeholder="Dejar en blanco si no está medida"><small>La superficie de la nave no equivale a la superficie útil de cada zona.</small></label>
           <div id="draftCount" class="summary">Selecciona una zona y pulsa «Dibujar zona» para marcar los vértices.</div>
           <div class="tools spacer"><button class="button secondary" type="button" onclick="beginMapDrawing()">Dibujar zona</button><button class="button ghost" type="button" onclick="undoMapPoint()">Deshacer punto</button><button id="zoneSave" class="button" type="button" onclick="saveMapZone()">Guardar zona</button></div>
@@ -218,7 +228,7 @@
       <div class="panel-top"><div><h2>Registrar recepción</h2><p>El material entrará en el almacén seleccionado. Los campos con * son obligatorios.</p></div></div>
       <div class="form-grid">
         <label class="field"><span>Proyecto *</span><select id="rProject"></select></label>
-        <label class="field"><span>Zona de almacén *</span><select id="rZone"></select></label>
+        <label class="field"><span>Zona de entrada *</span><select id="rZone" onchange="receiptZoneHint()"></select></label>
         <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora"></label>
         <label class="field"><span>Albarán o factura *</span><input id="document" placeholder="Número de documento"></label>
       </div>
@@ -226,6 +236,7 @@
         <label class="field"><span>Enlace al documento</span><input id="documentUrl" type="url" placeholder="https://…"></label>
         <label class="field"><span>Observaciones generales</span><input id="rNote" placeholder="Información adicional de la entrega"></label>
       </div>
+      <div id="receiptQuarantineHint" class="notice warning spacer" hidden>Material inmovilizado: indica el motivo en la incidencia de cada línea. No aparecerá como disponible hasta que Calidad lo libere.</div>
       <div class="divider"></div>
       <div class="panel-top"><div><h3>Material recibido</h3><p>Puedes incluir varias referencias en el mismo albarán.</p></div><button type="button" class="button secondary small" onclick="addLine()">+ Añadir línea</button></div>
       <div id="receiptLines"></div>
@@ -251,7 +262,7 @@
   <script>
     const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
     const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
-    let credential='',state={},pendingReceipt='',pendingMove='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='';
+    let credential='',state={},pendingReceipt='',pendingMove='',pendingRelease='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='';
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     function status(message,type='success'){let el=$('status');el.textContent=message;el.className='flash '+type;el.hidden=!message}
@@ -271,13 +282,21 @@
     })}
     function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
       items.forEach(item=>el.add(new Option(item[label]||item[key],item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
-    const pages={map:['Plano nave 9','Consulta la planta real y el inventario por ubicación.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
+    const pages={map:['Plano nave 9','Consulta la planta real y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
     function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
       $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(id==='moves'&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
     const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'))}
     function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
+    function quarantineStock(){return(state.stock||[]).filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0)}
+    function receiptZoneHint(){$('receiptQuarantineHint').hidden=!state.zones?.some(z=>z.CODIGO===$('rZone').value&&z.AREA==='CUARENTENA')}
+    function renderQuality(){let rows=quarantineStock();$('navQuarantine').textContent=rows.length?'· '+rows.length:'';$('qualityEmpty').hidden=!!rows.length;
+      $('qualityRows').innerHTML=rows.map((x,i)=>'<div class="line"><div class="line-title"><h3>'+esc(x.description)+'</h3><span class="pill pending">BLOQUEADO · '+esc(x.quantity)+' '+esc(x.unit)+'</span></div><p class="muted">'+esc(x.project)+' · '+esc(x.zone)+(x.reference?' · '+esc(x.reference):'')+'</p>'+(['ADMIN','CALIDAD'].includes(state.user?.role)?'<div class="form-grid three"><label class="field"><span>Cantidad que se libera *</span><input type="number" min="0.001" step="0.001" max="'+esc(x.quantity)+'" value="'+esc(x.quantity)+'" id="qAmount'+i+'"></label><label class="field"><span>Destino disponible *</span><select id="qDestination'+i+'">'+(state.zones||[]).filter(z=>z.AREA==='ALMACEN').map(z=>'<option value="'+esc(z.CODIGO)+'">'+esc(z.NOMBRE||z.CODIGO)+'</option>').join('')+'</select></label><label class="field"><span>Motivo / decisión *</span><input id="qReason'+i+'" maxlength="250" placeholder="Comprobación realizada y resultado"></label></div><div class="tools spacer"><button type="button" class="button small" onclick="releaseQuality('+i+')">Liberar material</button></div>':'<p class="muted">Pendiente de liberación por Calidad.</p>')+'</div>').join('')}
+    async function releaseQuality(index){if(actionBusy||!['ADMIN','CALIDAD'].includes(state.user?.role))return;let x=quarantineStock()[index],quantity=$('qAmount'+index).value,reason=$('qReason'+index).value.trim(),destination=$('qDestination'+index).value;
+      if(!x||!positive(quantity)||Number(quantity)>Number(x.quantity)||!reason||!destination){status('Indica cantidad, destino y decisión documentada.','error');return}
+      if(!confirm('¿Liberar '+quantity+' '+x.unit+' de '+x.description+' hacia '+destination+'?'))return;
+      actionBusy=true;pendingRelease=pendingRelease||'op_'+crypto.randomUUID();status('Registrando la decisión de Calidad…','info');try{await call('releaseQuarantine',{batchId:pendingRelease,project:x.project,origin:x.zone,destination,materialId:x.materialId,quantity,reason});pendingRelease='';await afterSave('Material liberado con trazabilidad.','quality')}catch(e){fail(e)}finally{actionBusy=false}}
     function filteredStock(){let q=normalize($('search').value),p=$('stockProject').value,z=$('stockZone').value;
       return availableStock().filter(x=>(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
     function renderStock(){let rows=filteredStock();lastVisibleStock=rows;$('stockCount').textContent=rows.length+' posiciones visibles';$('stockEmpty').hidden=rows.length>0;
@@ -306,27 +325,27 @@
     function drawZoneShapes(){let parent=$('mapPolygons');parent.replaceChildren();
       for(const z of state.zoneMap||[]){if(!Array.isArray(z.points)||z.points.length<3||drawing&&editorZoneCode===z.code)continue;
         let poly=document.createElementNS(SVG_NS,'polygon');poly.setAttribute('points',z.points.map(p=>p.join(',')).join(' '));
-        poly.setAttribute('class','zone-shape'+($('mapDetail').dataset.zone===z.code?' selected':''));
+        poly.setAttribute('class','zone-shape'+(state.zones?.some(zone=>zone.CODIGO===z.code&&zone.AREA==='CUARENTENA')?' quarantine':'')+($('mapDetail').dataset.zone===z.code?' selected':''));
         poly.setAttribute('aria-label','Zona '+z.code+' · '+z.category);poly.setAttribute('role','button');poly.setAttribute('tabindex','0');
         poly.addEventListener('click',e=>{e.stopPropagation();if(drawing)mapCanvasClick(e);else selectMapZone(z.code)});
         poly.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectMapZone(z.code)}});
         let title=document.createElementNS(SVG_NS,'title');title.textContent=z.code+' · '+z.category;poly.append(title);parent.append(poly);
       }zoneDimensions();
     }
-    function renderMap(){let zones=(state.zones||[]).filter(z=>z.AREA==='ALMACEN');
-      $('mapZones').innerHTML=zones.map(z=>{let n=availableStock().filter(x=>x.zone===z.CODIGO).length,conf=mapConfig(z.CODIGO);
-        return '<button class="zone-item" type="button" data-zone="'+esc(z.CODIGO)+'" onclick="selectMapZone(this.dataset.zone)"><strong>'+esc(z.NOMBRE||z.CODIGO)+' · '+esc(z.CODIGO)+'</strong><span>'+n+' posición(es) con material · '+(conf?'En plano · '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':''):'sin delimitar en el plano')+'</span></button>'}).join('')||'<p class="muted">Todavía no hay ubicaciones de almacén configuradas.</p>';
+    function renderMap(){let zones=(state.zones||[]).filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA));
+      $('mapZones').innerHTML=zones.map(z=>{let n=(state.stock||[]).filter(x=>x.zone===z.CODIGO&&Number(x.quantity)>0).length,conf=mapConfig(z.CODIGO);
+        return '<button class="zone-item'+(z.AREA==='CUARENTENA'?' quarantine':'')+'" type="button" data-zone="'+esc(z.CODIGO)+'" onclick="selectMapZone(this.dataset.zone)"><strong>'+esc(z.NOMBRE||z.CODIGO)+' · '+esc(z.CODIGO)+(z.AREA==='CUARENTENA'?' · BLOQUEADO':'')+'</strong><span>'+n+' posición(es) con material · '+(conf?'En plano · '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':''):'sin delimitar en el plano')+'</span></button>'}).join('')||'<p class="muted">Todavía no hay ubicaciones configuradas.</p>';
       $('zoneEditorToggle').hidden=state.user?.role!=='ADMIN'||!state.zoneMapSupported;
       $('mapSetupHint').hidden=state.user?.role!=='ADMIN'||state.zoneMapSupported;
       if(!state.zoneMapSupported)$('zoneEditor').hidden=true;
       if(state.zoneMapSupported)setChoices('zonePick',zones,'CODIGO','NOMBRE','Nueva zona');
       drawZoneShapes();let previous=$('mapDetail').dataset.zone;
       if(previous&&zones.some(z=>z.CODIGO===previous))selectMapZone(previous);else $('mapDetail').textContent='Selecciona una ubicación de almacén.'}
-    function selectMapZone(code){let zone=(state.zones||[]).find(z=>z.CODIGO===code&&z.AREA==='ALMACEN');if(!zone)return;
+    function selectMapZone(code){let zone=(state.zones||[]).find(z=>z.CODIGO===code&&['ALMACEN','CUARENTENA'].includes(z.AREA));if(!zone)return;
       $('mapDetail').dataset.zone=code;document.querySelectorAll('.zone-item').forEach(b=>b.classList.toggle('selected',b.dataset.zone===code));
-      drawZoneShapes();let items=availableStock().filter(x=>x.zone===code),conf=mapConfig(code);
+      drawZoneShapes();let items=(state.stock||[]).filter(x=>x.zone===code&&Number(x.quantity)>0),conf=mapConfig(code);
       let lengths=conf?.points?.map((p,i)=>metresText(p,conf.points[(i+1)%conf.points.length])).join(' · ');
-      $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+' · '+(conf?'en plano · categoría: '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':' · superficie útil pendiente'):'posición exacta pendiente')+'</small>'+(lengths?'<small>Lados aproximados: '+esc(lengths)+'</small>':'')+(items.length?'<ul>'+items.map(x=>'<li><strong>'+esc(x.description)+'</strong> · '+esc(x.quantity)+' '+esc(x.unit)+'<small>'+esc(x.project)+(x.reference?' · '+esc(x.reference):'')+'</small></li>').join('')+'</ul>':'<p class="muted">Sin existencias en esta ubicación.</p>')}
+      $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+(zone.AREA==='CUARENTENA'?' · MATERIAL BLOQUEADO':'')+' · '+(conf?'en plano · categoría: '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':' · superficie útil pendiente'):'posición exacta pendiente')+'</small>'+(lengths?'<small>Lados aproximados: '+esc(lengths)+'</small>':'')+(items.length?'<ul>'+items.map(x=>'<li><strong>'+esc(x.description)+'</strong> · '+esc(x.quantity)+' '+esc(x.unit)+'<small>'+esc(x.project)+(x.reference?' · '+esc(x.reference):'')+'</small></li>').join('')+'</ul>':'<p class="muted">Sin existencias en esta ubicación.</p>')}
     function nextZoneCode(){let used=new Set((state.zones||[]).map(z=>z.CODIGO));let n=1;
       while(used.has('N9-'+String(n).padStart(2,'0')))n++;return 'N9-'+String(n).padStart(2,'0')}
     function markZoneDirty(){draftDirty=true;renderDraft()}
@@ -337,7 +356,7 @@
       if(!editor.hidden)loadZoneEditor();else{drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();$('mapDraft').replaceChildren();drawZoneShapes()}}
     function loadZoneEditor(){let code=$('zonePick').value,z=(state.zones||[]).find(x=>x.CODIGO===code),conf=mapConfig(code);
       editorZoneCode=code;$('zoneCode').value=code||nextZoneCode();$('zoneCode').readOnly=!!code;$('zoneName').value=z?.NOMBRE||'';
-      $('zoneCategory').value=conf?.category||'';$('zoneArea').value=conf?.area||'';
+      $('zoneCategory').value=conf?.category||'';$('zoneArea').value=conf?.area||'';$('zoneUse').value=z?.AREA==='CUARENTENA'?'CUARENTENA':'ALMACEN';$('zoneUse').disabled=!!code;
       draftPoints=conf?.points?.map(p=>[...p])||[];drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
       if(code)selectMapZone(code);else{delete $('mapDetail').dataset.zone;$('mapDetail').textContent='Nueva zona '+$('zoneCode').value+': dibuja su perímetro y pulsa «Guardar zona». Las zonas verdes ya guardadas siguen en el plano.';
         document.querySelectorAll('.zone-item').forEach(b=>b.classList.remove('selected'));drawZoneShapes()}
@@ -365,13 +384,13 @@
       if(draftPoints.length>=20){status('Máximo 20 vértices por zona.','error');return}
       draftPoints.push([x,y]);draftDirty=true;geometryDirty=true;clearMapMeasure();renderDraft()}
     async function saveMapZone(){if(state.user?.role!=='ADMIN'||!state.zoneMapSupported)return;
-      let code=$('zoneCode').value.trim().toUpperCase(),name=$('zoneName').value.trim(),category=$('zoneCategory').value.trim(),area=$('zoneArea').value.trim();
+      let code=$('zoneCode').value.trim().toUpperCase(),name=$('zoneName').value.trim(),category=$('zoneCategory').value.trim(),area=$('zoneArea').value.trim(),use=$('zoneUse').value;
       if(!/^[A-Z0-9-]{2,20}$/.test(code)||!name||!category||draftPoints.length<3){status('Completa código, nombre, categoría y al menos tres puntos.','error');return}
       if(!confirm('Guardar la delimitación de '+code+' para todos los usuarios?'))return;
       $('zoneSave').disabled=true;status('Guardando la zona…','info');
-      try{let r=await call('saveZoneMap',{code,name,category,area,points:draftPoints});drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
+      try{let r=await call('saveZoneMap',{code,name,category,area,use,points:draftPoints});drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
         let result=await call('bootstrap');state.zones=result.zones;state.zoneMap=result.zoneMap;state.zoneMapSupported=true;
-        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
+        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();
         setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
         setChoices('mDestination',state.zones,'CODIGO','NOMBRE');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderMap();$('zonePick').value=r.code;loadZoneEditor();selectMapZone(r.code);status('Zona '+r.code+' guardada en el plano.')}
@@ -383,7 +402,7 @@
           if(camp)buttons+='<button type="button" class="button small" data-batch="'+esc(x.ID_LOTE)+'" onclick="confirmMove(this.dataset.batch)">Confirmar</button>';
           if(state.user.role==='ADMIN')buttons+='<button type="button" class="button danger small" data-batch="'+esc(x.ID_LOTE)+'" onclick="cancelMovement(this.dataset.batch)">Anular</button>'}
         seen.add(x.ID_LOTE);let kind=x.ESTADO==='PENDIENTE'?'pending':x.ESTADO==='RECIBIDO'?'received':x.ESTADO==='ANULADO'?'cancelled':'';
-        let details=[x.PROVEEDOR,x.DOCUMENTO_NUMERO].filter(Boolean).join(' · '),date=String(x.FECHA||'').slice(0,16).replace('T',' ');
+        let details=[x.PROVEEDOR,x.DOCUMENTO_NUMERO,x.INCIDENCIA,x.OBSERVACIONES,x.ACTOR].filter(Boolean).join(' · '),date=String(x.FECHA||'').slice(0,16).replace('T',' ');
         return '<tr><td data-label="Fecha / lote">'+esc(date)+'<small>'+esc(x.ID_LOTE.slice(0,12))+'</small></td><td data-label="Material"><strong>'+esc(x.DESCRIPCION)+'</strong>'+(details?'<small>'+esc(details)+'</small>':'')+'</td><td data-label="Cantidad" class="right"><span class="qty">'+esc(x.CANTIDAD)+' '+esc(x.UNIDAD)+'</span></td><td data-label="Ruta">'+esc(x.ORIGEN||'Proveedor')+' → '+esc(x.DESTINO)+'<small>'+esc(x.PROYECTO)+'</small></td><td data-label="Estado"><span class="pill '+kind+'">'+esc(x.ESTADO)+'</span></td><td data-label="Acciones" class="right"><div class="actions">'+buttons+'</div></td></tr>'}).join('')}
     function renderSummary(){let stock=availableStock(),ids=new Set(stock.map(x=>x.materialId)),zones=new Set(stock.map(x=>x.zone)),projects=new Set(stock.map(x=>x.project)),batches=new Set(pendingEvents().map(x=>x.ID_LOTE));
       $('statReferences').textContent=ids.size;$('statZones').textContent=zones.size;$('statProjects').textContent=projects.size;$('statPending').textContent=batches.size;
@@ -393,7 +412,7 @@
       $('materialHint').textContent=items.length?items.length+' referencias disponibles en esta ubicación.':'No hay material disponible en esta ubicación.';renderMoveSummary()}
     function renderMoveSummary(){let material=availableStock().find(x=>x.project===$('mProject').value&&x.zone===$('mOrigin').value&&x.materialId===$('mMaterial').value);
       let quantity=$('mQuantity').value,destination=$('mDestination').value,zone=state.zones.find(z=>z.CODIGO===destination);
-      $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(zone?.AREA==='CAMPA'?' · Pendiente de recepción en campa':''):'Selecciona primero un material para preparar el traslado.'}
+      $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(zone?.AREA==='CAMPA'?' · Pendiente de recepción en campa':zone?.AREA==='CUARENTENA'?' · Quedará bloqueado hasta liberación de Calidad':''):'Selecciona primero un material para preparar el traslado.'}
     function addLine(){let d=document.createElement('div');d.className='line';
       d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Recibida *</span><input class="quantity" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field"><span>Esperada</span><input class="expected" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field incident"><span>Incidencia de esta línea</span><input class="incident" maxlength="250" placeholder="Indica faltantes o daños si los hay"></label></div>';
       $('receiptLines').append(d);numberLines()}
@@ -413,19 +432,21 @@
     function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
       let material=availableStock().find(x=>x.project===project&&x.zone===origin&&x.materialId===id);
       if(!project||!origin||!destination||origin===destination)throw Error('Elige un proyecto y dos ubicaciones distintas.');
+      if(state.zones.some(z=>z.CODIGO===destination&&z.AREA==='CUARENTENA')&&!$('mNote').value.trim())throw Error('Indica el motivo para inmovilizar material en cuarentena.');
       if(!material)throw Error('Selecciona un material disponible en el origen.');
       if(!positive(quantity)||Number(quantity)>material.quantity+1e-8)throw Error('Introduce una cantidad válida, sin superar '+material.quantity+' '+material.unit+' disponibles.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
+        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
-        renderSummary();renderStock();renderMoves();renderMap();available();if(manual)status('Datos actualizados.')}
+        renderSummary();renderStock();renderMoves();renderMap();renderQuality();available();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),'stock')}
+        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),state.zones.some(z=>z.CODIGO===p.zone&&z.AREA==='CUARENTENA')?'quality':'stock')}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}
@@ -448,10 +469,11 @@
       let url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='existencias-almacen-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
     async function signedIn(result){credential=result.credential;$('loginError').hidden=true;
       try{state=await call('bootstrap');state.zoneMapSupported=Array.isArray(state.zoneMap);state.zoneMap=state.zoneMap||[];$('login').hidden=true;$('app').hidden=false;$('identity').hidden=false;
+        document.querySelector('[data-view="quality"]').hidden=!state.quarantineSupported;$('zoneUseField').hidden=!state.quarantineSupported;
         $('userName').textContent=state.user.name;$('userRole').textContent=state.user.role;
         document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
         setChoices('rProject',state.projects,'CODIGO','CODIGO');setChoices('mProject',state.projects,'CODIGO','CODIGO');
-        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
+        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();
         setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         addLine();await refresh();view('stock',false)}
       catch(e){$('app').hidden=true;$('login').hidden=false;$('identity').hidden=true;$('loginError').textContent=e.message;$('loginError').hidden=false}}
@@ -460,3 +482,4 @@
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
 </body>
 </html>
+
