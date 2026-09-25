@@ -98,6 +98,16 @@
     .line-grid{display:grid;grid-template-columns:2fr 1.2fr 1.2fr .8fr 1fr 1fr;gap:12px}
     .line-grid .incident{grid-column:span 3}
     .summary{padding:14px 16px;border-radius:10px;background:#edf5f6;margin-top:16px;color:#305e68;font-size:13px;line-height:1.5}
+    .map-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr);gap:18px}
+    .floor-wrap{padding:18px;border:1px solid #dce6eb;border-radius:12px;background:#f8fafb}
+    .floor-wrap svg{width:100%;height:auto;display:block}
+    .zone-list{display:grid;gap:9px;margin:15px 0}
+    .zone-item{width:100%;text-align:left;border:1px solid #d7e4e8;background:#fff;border-radius:10px;padding:12px 14px;color:#17334a}
+    .zone-item:hover,.zone-item.selected{border-color:#16a5a7;background:#eef8f7}
+    .zone-item strong{display:block;font-size:13px}.zone-item span{display:block;margin-top:3px;color:#657c8c;font-size:12px}
+    .map-detail{border-top:1px solid #e1e9ed;padding-top:16px;line-height:1.5}
+    .map-detail ul{padding-left:18px;margin:10px 0 0}.map-detail li{margin:7px 0;font-size:13px}
+    .map-detail small{display:block;color:#708292}
     .login-wrap{min-height:calc(100vh - 85px);display:grid;place-items:center;padding:22px}
     .login-card{width:min(100%,460px);padding:33px}
     .login-icon{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:#e3f5f2;color:#117b86;font-size:26px;margin-bottom:19px}
@@ -105,7 +115,7 @@
     .login-card p{font-size:14px;color:#5e7082;line-height:1.55;margin:9px 0 21px}
     .login-card .flash{margin:18px 0 0}
     footer{padding:24px 0 8px;color:#8b9ba7;font-size:11px}
-    @media(max-width:980px){.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-grid .incident{grid-column:span 2}}
+    @media(max-width:980px){.map-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-grid .incident{grid-column:span 2}}
     @media(max-width:640px){.topbar-inner{padding:15px 16px}.layout{padding:18px 12px}.pagehead{display:block}.pagehead .button{margin-top:12px}.panel{padding:18px 13px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:23px}.tab{padding:11px 12px}.form-grid,.form-grid.two,.form-grid.three,.line-grid{grid-template-columns:1fr}.span2,.line-grid .incident{grid-column:auto}.form-footer .button{flex:1}.tools .filter{flex:1 1 43%}.table-wrap{overflow:visible}table{min-width:0}thead{display:none}tbody,tr,td{display:block}tr{border:1px solid #e2e9ed;border-radius:10px;margin:10px 0;padding:8px}td{border:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 8px;text-align:right}td:before{content:attr(data-label);color:#728697;font-size:11px;font-weight:750;text-transform:uppercase;text-align:left}td .actions{max-width:75%}td small{text-align:right}.empty{padding:25px 10px}}
   </style>
 </head>
@@ -119,6 +129,7 @@
     <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" onclick="refresh(true)" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
     <nav class="tabs" aria-label="Secciones">
       <button class="tab active" type="button" data-view="stock" onclick="view('stock')">Existencias</button>
+      <button class="tab" type="button" data-view="map" onclick="view('map')">Plano nave 9</button>
       <button class="tab" type="button" data-view="moves" onclick="view('moves')">Movimientos <span id="navPending"></span></button>
       <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
       <button class="tab write" type="button" data-view="transfer" onclick="view('transfer')">Mover material</button>
@@ -131,7 +142,7 @@
         <div class="stat"><span>Proyectos</span><strong id="statProjects">0</strong><small>Con stock registrado</small></div>
         <div class="stat alert"><span>Pendientes en campa</span><strong id="statPending">0</strong><small>Lotes por confirmar</small></div>
       </div>
-      <div id="transitNote" class="notice warning" hidden>↗ <span>Hay movimientos pendientes de recepción en campa. Esas cantidades se muestran en el historial y no figuran como disponibles en el destino hasta confirmarlas.</span></div>
+      <div id="transitNote" class="notice warning" hidden>↗ <span>Hay entregas pendientes de confirmación en campa. Se muestran en el historial y no cuentan como existencias disponibles del almacén.</span></div>
       <div class="card panel">
         <div class="panel-top"><div><h2>Existencias</h2><p>Busca y filtra para localizar material rápidamente.</p></div></div>
         <div class="tools">
@@ -143,6 +154,26 @@
         <p id="stockCount" class="count"></p>
         <div class="table-wrap"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Ubicación</th><th class="right">Disponible</th></tr></thead><tbody id="stockRows"></tbody></table></div>
         <div id="stockEmpty" class="empty" hidden><b>Sin resultados</b>Ajusta los filtros o registra una recepción.</div>
+      </div>
+    </section>
+    <section id="map" hidden>
+      <div class="card panel"><div class="panel-top"><div><h2>Nave 9 · planta baja</h2><p>Contorno obtenido del DWG entregado. Superficie de la nave según el plano: 431,28 m².</p></div></div>
+        <div class="map-grid">
+          <div><div class="floor-wrap"><svg viewBox="0 0 680 680" role="img" aria-labelledby="floorTitle floorDesc">
+            <title id="floorTitle">Contorno de la nave 9 en planta baja</title><desc id="floorDesc">Nave de planta aproximadamente rectangular con esquina inferior izquierda achaflanada. El dibujo original no señala zonas de almacenamiento dentro de la nave.</desc>
+            <defs><pattern id="floorGrid" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M 25 0 L 0 0 0 25" fill="none" stroke="#e5ebed" stroke-width="1"/></pattern></defs>
+            <path d="M65 70 H575 V590 H235 L65 420 Z" fill="#eaf2f4" stroke="#163a50" stroke-width="5" stroke-linejoin="round"/>
+            <path d="M65 70 H575 V590 H235 L65 420 Z" fill="url(#floorGrid)"/>
+            <text x="320" y="265" text-anchor="middle" fill="#183e54" font-size="32" font-weight="750">NAVE 9</text>
+            <text x="320" y="305" text-anchor="middle" fill="#486a7a" font-size="18">431,28 m² · planta baja</text>
+            <text x="320" y="343" text-anchor="middle" fill="#557b85" font-size="14">Zonas interiores pendientes de señalar</text>
+            <path d="M65 47 H575" stroke="#859eaa" stroke-width="1"/><text x="320" y="39" text-anchor="middle" fill="#617986" font-size="14">20,87 m en el plano</text>
+            <path d="M600 70 V590" stroke="#859eaa" stroke-width="1"/><text x="626" y="335" transform="rotate(90 626 335)" text-anchor="middle" fill="#617986" font-size="14">21,31 m en el plano</text>
+          </svg></div><p class="intro">El contorno y la superficie proceden del DWG. Las líneas interiores, accesos libres y superficies útiles de almacenamiento se definirán sobre la realidad de la nave.</p></div>
+          <div><h3>Ubicaciones registradas</h3><p class="intro">Elige una ubicación para consultar lo que figura en ella. Sus límites todavía no están situados sobre el plano.</p>
+            <div id="mapZones" class="zone-list"></div><div id="mapDetail" class="map-detail" aria-live="polite">Selecciona una ubicación de almacén.</div>
+          </div>
+        </div>
       </div>
     </section>
     <section id="moves" hidden>
@@ -214,18 +245,25 @@
     })}
     function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
       items.forEach(item=>el.add(new Option(item[label]||item[key],item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
-    const pages={stock:['Existencias','Material disponible por proyecto y ubicación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
+    const pages={map:['Plano nave 9','Consulta la planta real y el inventario por ubicación.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
     function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
       $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(id==='moves'&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
     const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'))}
-    function availableStock(){let pending={};pendingEvents().forEach(e=>{let key=[e.PROYECTO,e.DESTINO,e.MATERIAL_ID].join('\u001f');pending[key]=(pending[key]||0)+Number(e.CANTIDAD)});
-      return(state.stock||[]).map(x=>({...x,quantity:Math.max(0,Math.round((Number(x.quantity)-(pending[[x.project,x.zone,x.materialId].join('\u001f')]||0))*1000)/1000)})).filter(x=>x.quantity>0)}
+    function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
     function filteredStock(){let q=normalize($('search').value),p=$('stockProject').value,z=$('stockZone').value;
       return availableStock().filter(x=>(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
     function renderStock(){let rows=filteredStock();lastVisibleStock=rows;$('stockCount').textContent=rows.length+' posiciones visibles';$('stockEmpty').hidden=rows.length>0;
       $('stockRows').innerHTML=rows.map(x=>'<tr><td data-label="Material"><strong>'+esc(x.description)+'</strong></td><td data-label="Referencia">'+esc(x.reference||'—')+'</td><td data-label="Proyecto">'+esc(x.project)+'</td><td data-label="Ubicación">'+esc(x.zone)+'</td><td data-label="Disponible" class="right"><span class="qty">'+esc(x.quantity)+' '+esc(x.unit)+'</span></td></tr>').join('')}
+    function renderMap(){let zones=(state.zones||[]).filter(z=>z.AREA==='ALMACEN');
+      $('mapZones').innerHTML=zones.map(z=>{let n=availableStock().filter(x=>x.zone===z.CODIGO).length;
+        return '<button class="zone-item" type="button" data-zone="'+esc(z.CODIGO)+'" onclick="selectMapZone(this.dataset.zone)"><strong>'+esc(z.NOMBRE||z.CODIGO)+' · '+esc(z.CODIGO)+'</strong><span>'+n+' posición(es) con material · sin delimitar en el plano</span></button>'}).join('')||'<p class="muted">Todavía no hay ubicaciones de almacén configuradas.</p>';
+      let previous=$('mapDetail').dataset.zone;if(previous&&zones.some(z=>z.CODIGO===previous))selectMapZone(previous);else $('mapDetail').textContent='Selecciona una ubicación de almacén.'}
+    function selectMapZone(code){let zone=(state.zones||[]).find(z=>z.CODIGO===code&&z.AREA==='ALMACEN');if(!zone)return;
+      $('mapDetail').dataset.zone=code;document.querySelectorAll('.zone-item').forEach(b=>b.classList.toggle('selected',b.dataset.zone===code));
+      let items=availableStock().filter(x=>x.zone===code);
+      $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+' · ubicación registrada · posición exacta pendiente</small>'+(items.length?'<ul>'+items.map(x=>'<li><strong>'+esc(x.description)+'</strong> · '+esc(x.quantity)+' '+esc(x.unit)+'<small>'+esc(x.project)+(x.reference?' · '+esc(x.reference):'')+'</small></li>').join('')+'</ul>':'<p class="muted">Sin existencias en esta ubicación.</p>')}
     function renderMoves(){let q=normalize($('moveSearch').value),f=$('moveFilter').value,seen=new Set(),rows=(state.movements||[]).filter(x=>(!f||x.ESTADO===f)&&normalize([x.DESCRIPCION,x.ID_LOTE,x.PROYECTO,x.ORIGEN,x.DESTINO,x.DOCUMENTO_NUMERO,x.PROVEEDOR].join(' ')).includes(q));
       $('moveCount').textContent=rows.length+' movimientos visibles';$('moveEmpty').hidden=rows.length>0;
       $('moveRows').innerHTML=rows.map(x=>{let first=!seen.has(x.ID_LOTE),camp=state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'),buttons='';
@@ -268,8 +306,8 @@
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
       try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;
-        setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones,'CODIGO','NOMBRE','Todas');
-        renderSummary();renderStock();renderMoves();available();if(manual)status('Datos actualizados.')}
+        setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
+        renderSummary();renderStock();renderMoves();renderMap();available();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
@@ -302,7 +340,7 @@
         document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
         setChoices('rProject',state.projects,'CODIGO','CODIGO');setChoices('mProject',state.projects,'CODIGO','CODIGO');
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
-        setChoices('mOrigin',state.zones,'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
+        setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         addLine();await refresh();view('stock',false)}
       catch(e){$('app').hidden=true;$('login').hidden=false;$('identity').hidden=true;$('loginError').textContent=e.message;$('loginError').hidden=false}}
     function initGoogle(){google.accounts.id.initialize({client_id:CLIENT_ID,callback:signedIn,ux_mode:'popup'});google.accounts.id.renderButton($('signin'),{theme:'outline',size:'large',text:'signin_with',width:250})}
