@@ -110,10 +110,12 @@
     .map-detail small{display:block;color:#708292}
     #warehousePlan.editor{cursor:crosshair;touch-action:none}
     #warehousePlan text{pointer-events:none}
-    .zone-shape{fill:#18a5a744;stroke:#067d83;stroke-width:2.5;cursor:pointer;transition:fill .15s}
-    .zone-shape:hover,.zone-shape.selected{fill:#12a3a777;stroke:#074e59;stroke-width:4}
+    .zone-shape{fill:var(--zone-color,#18a5a744);stroke:#067d83;stroke-width:2.5;cursor:pointer;transition:filter .15s}
+    .zone-shape:hover,.zone-shape.selected{filter:saturate(1.7);stroke-width:4}
     .zone-shape.quarantine{fill:#f5ad3766;stroke:#aa6410}.zone-shape.quarantine:hover,.zone-shape.quarantine.selected{fill:#f5ad37aa;stroke:#87470a}
     .zone-item.quarantine{border-color:#e7c183;background:#fffaf0}
+    .floor-wrap{position:relative}.map-tooltip{position:absolute;z-index:3;max-width:230px;padding:8px 11px;border-radius:8px;background:#14273b;color:#fff;font-size:12px;line-height:1.4;pointer-events:none;box-shadow:0 4px 15px #14273b33}
+    .map-legend{display:flex;gap:15px;flex-wrap:wrap;margin:10px 0 0;color:#5e7082;font-size:12px}.map-legend span:before{content:' ';display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;border-radius:3px;background:#199d9c}.map-legend .blocked:before{background:#e8a43c}
     .dimension-label{font-size:13px;font-weight:800;fill:#163a50;stroke:#fff;stroke-width:5px;paint-order:stroke;pointer-events:none}
     .dimension-preview{stroke:#a96a10;stroke-width:2;stroke-dasharray:6 5;pointer-events:none}
     #mapDimensions,#mapMeasure{pointer-events:none}
@@ -177,20 +179,17 @@
       </div>
     </section>
     <section id="map" hidden>
-      <div class="card panel"><div class="panel-top"><div><h2>Nave 9 · planta baja</h2><p>Contorno obtenido del DWG entregado. Superficie de la nave según el plano: 431,28 m².</p></div></div>
+      <div class="card panel"><div class="panel-top"><div><h2>Nave 9 · planta baja</h2><p>Selecciona una zona para consultar su material.</p></div></div>
         <div class="map-grid">
-          <div><div class="floor-wrap"><svg id="warehousePlan" viewBox="0 0 680 680" onclick="mapCanvasClick(event)" onpointermove="mapCanvasMove(event)" onpointerleave="clearMapMeasure()" role="img" aria-labelledby="floorTitle floorDesc">
+          <div><div class="floor-wrap"><svg id="warehousePlan" viewBox="0 0 680 680" onclick="mapCanvasClick(event)" onpointermove="mapCanvasMove(event)" onpointerleave="clearMapMeasure();hideMapTooltip()" role="img" aria-labelledby="floorTitle floorDesc">
             <title id="floorTitle">Contorno de la nave 9 en planta baja</title><desc id="floorDesc">Nave de planta aproximadamente rectangular con esquina inferior izquierda achaflanada. El dibujo original no señala zonas de almacenamiento dentro de la nave.</desc>
             <defs><pattern id="floorGrid" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M 25 0 L 0 0 0 25" fill="none" stroke="#e5ebed" stroke-width="1"/></pattern></defs>
             <path d="M65 70 H575 V590 H235 L65 420 Z" fill="#eaf2f4" stroke="#163a50" stroke-width="5" stroke-linejoin="round"/>
             <path d="M65 70 H575 V590 H235 L65 420 Z" fill="url(#floorGrid)"/>
             <g id="mapPolygons"></g><g id="mapDimensions"></g><g id="mapDraft"></g><g id="mapMeasure"></g>
-            <text x="320" y="265" text-anchor="middle" fill="#183e54" font-size="32" font-weight="750">NAVE 9</text>
-            <text x="320" y="305" text-anchor="middle" fill="#486a7a" font-size="18">431,28 m² · planta baja</text>
-            <text x="320" y="343" text-anchor="middle" fill="#557b85" font-size="14">Zonas interiores pendientes de señalar</text>
             <path d="M65 47 H575" stroke="#859eaa" stroke-width="1"/><text x="320" y="39" text-anchor="middle" fill="#617986" font-size="14">20,87 m en el plano</text>
             <path d="M600 70 V590" stroke="#859eaa" stroke-width="1"/><text x="626" y="335" transform="rotate(90 626 335)" text-anchor="middle" fill="#617986" font-size="14">21,31 m en el plano</text>
-          </svg></div><p class="intro">Cotas de zona aproximadas, calculadas a partir de las cotas generales del DWG. Verifica cada tramo en la nave antes de pintar o dimensionar zonas. La superficie útil se introduce tras medirla.</p></div>
+          </svg><div id="mapTooltip" class="map-tooltip" hidden></div></div><div class="map-legend"><span>Zonas de almacén</span><span class="blocked">Cuarentena</span></div><p class="intro">Las cotas dibujadas son aproximadas; mide físicamente antes de señalizar el suelo.</p></div>
           <div><h3>Ubicaciones registradas</h3><p class="intro">Elige una ubicación para consultar lo que figura en ella. Pulsa una zona dibujada o una ubicación de la lista para consultar su material.</p>
             <div id="mapZones" class="zone-list"></div><div id="mapDetail" class="map-detail" aria-live="polite">Selecciona una ubicación de almacén.</div>
             <div id="mapSetupHint" class="notice warning" hidden>Para delimitar zonas desde aquí, actualiza primero el código de Apps Script y su implementación web.</div>
@@ -225,11 +224,11 @@
       </div>
     </section>
     <section id="receipt" class="card panel" hidden>
-      <div class="panel-top"><div><h2>Registrar recepción</h2><p>El material entrará en el almacén seleccionado. Los campos con * son obligatorios.</p></div></div>
+      <div class="panel-top"><div><h2>Registrar recepción</h2><p>Elige una zona para todo el albarán o una diferente en cada línea. Los campos con * son obligatorios.</p></div></div>
       <div class="form-grid">
-        <label class="field"><span>Proyecto *</span><select id="rProject"></select></label>
-        <label class="field"><span>Zona de entrada *</span><select id="rZone" onchange="receiptZoneHint()"></select></label>
-        <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora"></label>
+        <label class="field"><span>Proyecto *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select></label>
+        <label class="field"><span>Zona general *</span><select id="rZone" onchange="receiptZoneHint()"></select><small>Por defecto, todas las líneas van aquí.</small></label>
+        <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora" onchange="updateReceiptSuggestions()"></label>
         <label class="field"><span>Albarán o factura *</span><input id="document" placeholder="Número de documento"></label>
       </div>
       <div class="form-grid two spacer">
@@ -240,6 +239,7 @@
       <div class="divider"></div>
       <div class="panel-top"><div><h3>Material recibido</h3><p>Puedes incluir varias referencias en el mismo albarán.</p></div><button type="button" class="button secondary small" onclick="addLine()">+ Añadir línea</button></div>
       <div id="receiptLines"></div>
+      <div id="receiptSuggestionsTools" class="tools spacer" hidden><button type="button" class="button secondary small" onclick="assignSuggestedZones()">Aplicar sugerencias a las líneas sin zona</button><small class="muted">Comprueba las sugerencias antes de registrar.</small></div>
       <div class="form-footer"><button id="receiptSubmit" type="button" class="button" onclick="saveReceipt()">Registrar recepción</button></div>
     </section>
     <section id="transfer" class="card panel" hidden>
@@ -290,7 +290,8 @@
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'))}
     function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
     function quarantineStock(){return(state.stock||[]).filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0)}
-    function receiptZoneHint(){$('receiptQuarantineHint').hidden=!state.zones?.some(z=>z.CODIGO===$('rZone').value&&z.AREA==='CUARENTENA')}
+    function receiptZoneHint(){$('receiptQuarantineHint').hidden=![...document.querySelectorAll('#receiptLines .line')].some(line=>isQuarantine(line.querySelector('.line-zone')?.value||$('rZone').value));updateReceiptSuggestions()}
+    function isQuarantine(code){return state.zones?.some(z=>z.CODIGO===code&&z.AREA==='CUARENTENA')}
     function renderQuality(){let rows=quarantineStock();$('navQuarantine').textContent=rows.length?'· '+rows.length:'';$('qualityEmpty').hidden=!!rows.length;
       $('qualityRows').innerHTML=rows.map((x,i)=>'<div class="line"><div class="line-title"><h3>'+esc(x.description)+'</h3><span class="pill pending">BLOQUEADO · '+esc(x.quantity)+' '+esc(x.unit)+'</span></div><p class="muted">'+esc(x.project)+' · '+esc(x.zone)+(x.reference?' · '+esc(x.reference):'')+'</p>'+(['ADMIN','CALIDAD'].includes(state.user?.role)?'<div class="form-grid three"><label class="field"><span>Cantidad que se libera *</span><input type="number" min="0.001" step="0.001" max="'+esc(x.quantity)+'" value="'+esc(x.quantity)+'" id="qAmount'+i+'"></label><label class="field"><span>Destino disponible *</span><select id="qDestination'+i+'">'+(state.zones||[]).filter(z=>z.AREA==='ALMACEN').map(z=>'<option value="'+esc(z.CODIGO)+'">'+esc(z.NOMBRE||z.CODIGO)+'</option>').join('')+'</select></label><label class="field"><span>Motivo / decisión *</span><input id="qReason'+i+'" maxlength="250" placeholder="Comprobación realizada y resultado"></label></div><div class="tools spacer"><button type="button" class="button small" onclick="releaseQuality('+i+')">Liberar material</button></div>':'<p class="muted">Pendiente de liberación por Calidad.</p>')+'</div>').join('')}
     async function releaseQuality(index){if(actionBusy||!['ADMIN','CALIDAD'].includes(state.user?.role))return;let x=quarantineStock()[index],quantity=$('qAmount'+index).value,reason=$('qReason'+index).value.trim(),destination=$('qDestination'+index).value;
@@ -322,12 +323,19 @@
       for(const[name,value]of Object.entries({x1:start[0],y1:start[1],x2:end[0],y2:end[1]}))line.setAttribute(name,value);
       line.setAttribute('class','dimension-preview');group.append(line);segmentLabel(group,start,end)}
     function mapConfig(code){return(state.zoneMap||[]).find(z=>z.code===code)}
+    function hideMapTooltip(){$('mapTooltip').hidden=true}
+    function showMapTooltip(event,code){if(drawing)return;let zone=state.zones?.find(z=>z.CODIGO===code),count=(state.stock||[]).filter(x=>x.zone===code&&Number(x.quantity)>0).length;
+      let tip=$('mapTooltip'),bounds=tip.parentElement.getBoundingClientRect();tip.textContent=(zone?.NOMBRE||code)+' · '+code+(zone?.AREA==='CUARENTENA'?' · BLOQUEADO':'')+' · '+count+' referencias';tip.hidden=false;
+      tip.style.left=Math.min(Math.max(8,event.clientX-bounds.left+12),Math.max(8,bounds.width-tip.offsetWidth-8))+'px';tip.style.top=Math.max(8,event.clientY-bounds.top-tip.offsetHeight-10)+'px'}
     function drawZoneShapes(){let parent=$('mapPolygons');parent.replaceChildren();
       for(const z of state.zoneMap||[]){if(!Array.isArray(z.points)||z.points.length<3||drawing&&editorZoneCode===z.code)continue;
         let poly=document.createElementNS(SVG_NS,'polygon');poly.setAttribute('points',z.points.map(p=>p.join(',')).join(' '));
         poly.setAttribute('class','zone-shape'+(state.zones?.some(zone=>zone.CODIGO===z.code&&zone.AREA==='CUARENTENA')?' quarantine':'')+($('mapDetail').dataset.zone===z.code?' selected':''));
+        let idx=(state.zones||[]).filter(zone=>zone.AREA==='ALMACEN').findIndex(zone=>zone.CODIGO===z.code),colors=['#149aa0','#557bc3','#62a96d','#b578bb','#bc8d54','#4e9eae'];
+        if(idx>=0){let color=colors[idx%colors.length];poly.style.setProperty('--zone-color',color+'77');poly.style.stroke=color}
         poly.setAttribute('aria-label','Zona '+z.code+' · '+z.category);poly.setAttribute('role','button');poly.setAttribute('tabindex','0');
         poly.addEventListener('click',e=>{e.stopPropagation();if(drawing)mapCanvasClick(e);else selectMapZone(z.code)});
+        poly.addEventListener('pointermove',e=>showMapTooltip(e,z.code));poly.addEventListener('pointerleave',hideMapTooltip);
         poly.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectMapZone(z.code)}});
         let title=document.createElementNS(SVG_NS,'title');title.textContent=z.code+' · '+z.category;poly.append(title);parent.append(poly);
       }zoneDimensions();
@@ -414,20 +422,37 @@
       let quantity=$('mQuantity').value,destination=$('mDestination').value,zone=state.zones.find(z=>z.CODIGO===destination);
       $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(zone?.AREA==='CAMPA'?' · Pendiente de recepción en campa':zone?.AREA==='CUARENTENA'?' · Quedará bloqueado hasta liberación de Calidad':''):'Selecciona primero un material para preparar el traslado.'}
     function addLine(){let d=document.createElement('div');d.className='line';
-      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Recibida *</span><input class="quantity" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field"><span>Esperada</span><input class="expected" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field incident"><span>Incidencia de esta línea</span><input class="incident" maxlength="250" placeholder="Indica faltantes o daños si los hay"></label></div>';
-      $('receiptLines').append(d);numberLines()}
+      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200" onchange="updateReceiptSuggestions()"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Recibida *</span><input class="quantity" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field"><span>Esperada</span><input class="expected" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label><label class="field per-line-feature"><span>Ubicación de esta línea</span><select class="line-zone" onchange="receiptZoneHint()"><option value="">Zona general del albarán</option></select></label><label class="field incident"><span>Incidencia de esta línea</span><input class="incident" maxlength="250" placeholder="Indica faltantes o daños si los hay"></label></div><p class="count zone-suggestion" aria-live="polite"></p>';
+      d.querySelectorAll('.per-line-feature,.zone-suggestion').forEach(el=>el.hidden=!state.perLineZonesSupported);
+      $('receiptLines').append(d);fillLineZones(d);numberLines();updateReceiptSuggestions()}
+    function fillLineZones(line){let select=line.querySelector('.line-zone');if(!select)return;let selected=select.value;
+      select.replaceChildren(new Option('Zona general del albarán',''));(state.zones||[]).filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)).forEach(z=>select.add(new Option((z.AREA==='CUARENTENA'?'⚑ ':'')+(z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));select.value=selected;}
+    function updateReceiptSuggestions(){for(const line of document.querySelectorAll('#receiptLines .line')){fillLineZones(line);let hint=line.querySelector('.zone-suggestion'),proposal=proposeZone(line);hint.textContent=proposal?'Sugerencia: '+proposal.name+' ('+proposal.reason+'). Puedes elegirla en «Ubicación de esta línea».':'Sin sugerencia fiable; se aplicará la zona general si no eliges otra.'}receiptZoneHintDisplay()}
+    function receiptZoneHintDisplay(){$('receiptQuarantineHint').hidden=![...document.querySelectorAll('#receiptLines .line')].some(line=>isQuarantine(line.querySelector('.line-zone')?.value||$('rZone').value))}
+    function proposeZone(line){let project=$('rProject').value,reference=value(line,'reference'),description=value(line,'description'),category=value(line,'category'),supplier=$('supplier').value.trim();
+      let zones=(state.zones||[]).filter(z=>z.AREA==='ALMACEN'),stock=availableStock(),normalizeRef=s=>normalize(s).replace(/\s+/g,'');
+      let same=stock.filter(x=>x.project===project&&reference&&normalizeRef(x.reference)===normalizeRef(reference));
+      if(!same.length&&description)same=stock.filter(x=>x.project===project&&normalize(x.description)===normalize(description));
+      let existing=same.find(x=>zones.some(z=>z.CODIGO===x.zone));if(existing)return {code:existing.zone,name:zones.find(z=>z.CODIGO===existing.zone)?.NOMBRE||existing.zone,reason:'este material ya está allí'};
+      let cat=normalize(category).trim(),byCategory=zones.find(z=>{let zoneCat=normalize(mapConfig(z.CODIGO)?.category||'').trim();return cat.length>=4&&zoneCat.length>=4&&(zoneCat===cat||zoneCat.includes(cat)||cat.includes(zoneCat))});
+      if(byCategory)return {code:byCategory.CODIGO,name:byCategory.NOMBRE||byCategory.CODIGO,reason:'categoría '+category};
+      let bySupplier=(state.movements||[]).find(x=>x.TIPO==='RECEPCION'&&normalize(x.PROVEEDOR)===normalize(supplier)&&x.PROYECTO===project&&zones.some(z=>z.CODIGO===x.DESTINO));
+      if(supplier&&bySupplier)return {code:bySupplier.DESTINO,name:zones.find(z=>z.CODIGO===bySupplier.DESTINO)?.NOMBRE||bySupplier.DESTINO,reason:'última recepción de este proveedor'};
+      return null}
+    function assignSuggestedZones(){let count=0;document.querySelectorAll('#receiptLines .line').forEach(line=>{let select=line.querySelector('.line-zone'),proposal=proposeZone(line);if(select&&!select.value&&proposal){select.value=proposal.code;count++}});receiptZoneHint();status(count?count+' sugerencia(s) aplicadas. Comprueba las ubicaciones antes de registrar.':'No hay sugerencias suficientes para asignar.','info')}
     function numberLines(){document.querySelectorAll('#receiptLines .line-number').forEach((x,i)=>x.textContent=i+1)}
-    function removeLine(button){if(document.querySelectorAll('#receiptLines .line').length===1){status('Debe quedar al menos una línea de material.','error');return}button.closest('.line').remove();numberLines()}
+    function removeLine(button){if(document.querySelectorAll('#receiptLines .line').length===1){status('Debe quedar al menos una línea de material.','error');return}button.closest('.line').remove();numberLines();receiptZoneHint()}
     function suggestMaterial(input){let ref=input.value.trim().toLocaleLowerCase('es'),material=state.materials?.find(m=>m.REFERENCIA&&m.REFERENCIA.toLocaleLowerCase('es')===ref);
-      if(!material)return;let line=input.closest('.line');line.querySelector('.description').value=material.DESCRIPCION;line.querySelector('.manufacturer').value=material.FABRICANTE||'';
-      let unit=line.querySelector('.unit');if([...unit.options].some(o=>o.value===material.UNIDAD))unit.value=material.UNIDAD}
+      if(!material){updateReceiptSuggestions();return}let line=input.closest('.line');line.querySelector('.description').value=material.DESCRIPCION;line.querySelector('.manufacturer').value=material.FABRICANTE||'';line.querySelector('.category').value=material.CATEGORIA||'';
+      let unit=line.querySelector('.unit');if([...unit.options].some(o=>o.value===material.UNIDAD))unit.value=material.UNIDAD;updateReceiptSuggestions()}
     function positive(value){let n=Number(value);return Number.isFinite(n)&&n>0&&Math.round(n*1000)===n*1000}
-    function value(line,cls){return line.querySelector('.'+cls).value.trim()}
+    function value(line,cls){let control=line.querySelector('input.'+cls+', select.'+cls+', textarea.'+cls);return control?control.value.trim():''}
     function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
       if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, almacén, proveedor y número de albarán o factura.');
       if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
-      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','quantity','expected','incident'].map(k=>[k,value(line,k)]));
-        if(!item.description||!positive(item.quantity)||item.expected&&!positive(item.expected))throw Error('Revisa la descripción y las cantidades de la línea '+(i+1)+'.');return item});
+      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','quantity','expected','incident','category'].map(k=>[k,value(line,k)]));item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
+        if(!item.description||!positive(item.quantity)||item.expected&&!positive(item.expected))throw Error('Revisa la descripción y las cantidades de la línea '+(i+1)+'.');
+        if(isQuarantine(item.zone)&&!item.incident)throw Error('Indica el motivo de cuarentena en la línea '+(i+1)+'.');return item});
       return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
     function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
       let material=availableStock().find(x=>x.project===project&&x.zone===origin&&x.materialId===id);
@@ -437,16 +462,16 @@
       if(!positive(quantity)||Number(quantity)>material.quantity+1e-8)throw Error('Introduce una cantidad válida, sin superar '+material.quantity+' '+material.unit+' disponibles.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
-        renderSummary();renderStock();renderMoves();renderMap();renderQuality();available();if(manual)status('Datos actualizados.')}
+        renderSummary();renderStock();renderMoves();renderMap();renderQuality();available();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),state.zones.some(z=>z.CODIGO===p.zone&&z.AREA==='CUARENTENA')?'quality':'stock')}
+        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),p.lines.some(line=>isQuarantine(line.zone))?'quality':'stock')}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}
@@ -469,7 +494,7 @@
       let url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='existencias-almacen-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
     async function signedIn(result){credential=result.credential;$('loginError').hidden=true;
       try{state=await call('bootstrap');state.zoneMapSupported=Array.isArray(state.zoneMap);state.zoneMap=state.zoneMap||[];$('login').hidden=true;$('app').hidden=false;$('identity').hidden=false;
-        document.querySelector('[data-view="quality"]').hidden=!state.quarantineSupported;$('zoneUseField').hidden=!state.quarantineSupported;
+        document.querySelector('[data-view="quality"]').hidden=!state.quarantineSupported;$('zoneUseField').hidden=!state.quarantineSupported;$('receiptSuggestionsTools').hidden=!state.perLineZonesSupported;
         $('userName').textContent=state.user.name;$('userRole').textContent=state.user.role;
         document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
         setChoices('rProject',state.projects,'CODIGO','CODIGO');setChoices('mProject',state.projects,'CODIGO','CODIGO');
@@ -482,4 +507,3 @@
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
 </body>
 </html>
-
