@@ -97,6 +97,9 @@
     .line-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
     .line-grid{display:grid;grid-template-columns:2fr 1.2fr 1.2fr .8fr 1fr 1fr;gap:12px}
     .line-grid .incident{grid-column:span 3}
+    .receipt-result{margin-top:10px;padding:10px 12px;border-radius:8px;background:#f4f8fa;color:#36566b;font-size:12px;font-weight:700}
+    .receipt-result.warning{background:#fff4df;color:#8a5a0a;border:1px solid #f0d49b}
+    .quarantine-fields{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;padding:12px;border:1px solid #ecd19c;border-radius:9px;background:#fffaf1}
     .summary{padding:14px 16px;border-radius:10px;background:#edf5f6;margin-top:16px;color:#305e68;font-size:13px;line-height:1.5}
     .map-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr);gap:18px}
     .floor-wrap{padding:18px;border:1px solid #dce6eb;border-radius:12px;background:#f8fafb}
@@ -130,8 +133,8 @@
     .login-card p{font-size:14px;color:#5e7082;line-height:1.55;margin:9px 0 21px}
     .login-card .flash{margin:18px 0 0}
     footer{padding:24px 0 8px;color:#8b9ba7;font-size:11px}
-    @media(max-width:980px){.map-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-grid .incident{grid-column:span 2}}
-    @media(max-width:640px){.topbar-inner{padding:15px 16px}.layout{padding:18px 12px}.pagehead{display:block}.pagehead .button{margin-top:12px}.panel{padding:18px 13px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:23px}.tab{padding:11px 12px}.form-grid,.form-grid.two,.form-grid.three,.line-grid{grid-template-columns:1fr}.span2,.line-grid .incident{grid-column:auto}.form-footer .button{flex:1}.tools .filter{flex:1 1 43%}.table-wrap{overflow:visible}table{min-width:0}thead{display:none}tbody,tr,td{display:block}tr{border:1px solid #e2e9ed;border-radius:10px;margin:10px 0;padding:8px}td{border:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 8px;text-align:right}td:before{content:attr(data-label);color:#728697;font-size:11px;font-weight:750;text-transform:uppercase;text-align:left}td .actions{max-width:75%}td small{text-align:right}.empty{padding:25px 10px}}
+    @media(max-width:980px){.map-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-grid .incident{grid-column:span 2}.quarantine-fields{grid-template-columns:1fr 1fr}}
+    @media(max-width:640px){.topbar-inner{padding:15px 16px}.layout{padding:18px 12px}.pagehead{display:block}.pagehead .button{margin-top:12px}.panel{padding:18px 13px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:23px}.tab{padding:11px 12px}.form-grid,.form-grid.two,.form-grid.three,.line-grid{grid-template-columns:1fr}.span2,.line-grid .incident{grid-column:auto}.quarantine-fields{grid-template-columns:1fr}.form-footer .button{flex:1}.tools .filter{flex:1 1 43%}.table-wrap{overflow:visible}table{min-width:0}thead{display:none}tbody,tr,td{display:block}tr{border:1px solid #e2e9ed;border-radius:10px;margin:10px 0;padding:8px}td{border:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 8px;text-align:right}td:before{content:attr(data-label);color:#728697;font-size:11px;font-weight:750;text-transform:uppercase;text-align:left}td .actions{max-width:75%}td small{text-align:right}.empty{padding:25px 10px}}
   </style>
 </head>
 <body>
@@ -173,8 +176,8 @@
       </div>
     </section>
     <section id="quality" hidden>
-      <div class="notice warning">⚑ <span>Material separado y bloqueado. Registra el motivo de la inmovilización y conserva el documento de entrada. Calidad revisa y documenta la decisión; hasta entonces no se puede usar ni enviar a obra.</span></div>
-      <div class="card panel"><div class="panel-top"><div><h2>Material pendiente de revisión</h2><p>La liberación registra quién decidió, cuánto liberó, el motivo y la zona de destino. Se puede liberar una parte.</p></div></div>
+      <div class="notice warning">⚑ <span>Material separado y bloqueado. Calidad puede liberarlo, devolverlo al proveedor, enviarlo a reparación/reprocesado, solicitar sustitución o darlo de baja. Cada decisión queda añadida al historial sin borrar la recepción original.</span></div>
+      <div class="card panel"><div class="panel-top"><div><h2>Material pendiente de revisión</h2><p>Registra la resolución y la cantidad afectada. El material solo sale de cuarentena cuando se libera, se devuelve al proveedor o se da de baja.</p></div></div>
         <div id="qualityRows"></div><div id="qualityEmpty" class="empty" hidden><b>Sin material inmovilizado</b>Dibuja una zona de cuarentena en el plano para poder registrar entradas separadas.</div>
       </div>
     </section>
@@ -224,10 +227,10 @@
       </div>
     </section>
     <section id="receipt" class="card panel" hidden>
-      <div class="panel-top"><div><h2>Registrar recepción</h2><p>Elige una zona para todo el albarán o una diferente en cada línea. Los campos con * son obligatorios.</p></div></div>
+      <div class="panel-top"><div><h2>Registrar recepción</h2><p>Trabaja contra el albarán que recibe el almacén. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
       <div class="form-grid">
         <label class="field"><span>Proyecto *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select></label>
-        <label class="field"><span>Zona general *</span><select id="rZone" onchange="receiptZoneHint()"></select><small>Por defecto, todas las líneas van aquí.</small></label>
+        <label class="field"><span>Zona conforme por defecto *</span><select id="rZone" onchange="updateReceiptSuggestions()"></select><small>Solo para material conforme. La cuarentena se elige por línea cuando sea necesaria.</small></label>
         <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora" onchange="updateReceiptSuggestions()"></label>
         <label class="field"><span>Albarán o factura *</span><input id="document" placeholder="Número de documento"></label>
       </div>
@@ -235,9 +238,9 @@
         <label class="field"><span>Enlace al documento</span><input id="documentUrl" type="url" placeholder="https://…"></label>
         <label class="field"><span>Observaciones generales</span><input id="rNote" placeholder="Información adicional de la entrega"></label>
       </div>
-      <div id="receiptQuarantineHint" class="notice warning spacer" hidden>Material inmovilizado: indica el motivo en la incidencia de cada línea. No aparecerá como disponible hasta que Calidad lo libere.</div>
+      <div id="receiptQuarantineHint" class="notice warning spacer" hidden>Hay material marcado para cuarentena. Se registrará directamente como bloqueado, sin pasar antes por stock disponible.</div>
       <div class="divider"></div>
-      <div class="panel-top"><div><h3>Material recibido</h3><p>Puedes incluir varias referencias en el mismo albarán.</p></div><button type="button" class="button secondary small" onclick="addLine()">+ Añadir línea</button></div>
+      <div class="panel-top"><div><h3>Material del albarán</h3><p>Para cada referencia: cantidad del albarán, cantidad física y, si procede, cantidad que entra directamente en cuarentena.</p></div><button type="button" class="button secondary small" onclick="addLine()">+ Añadir línea</button></div>
       <div id="receiptLines"></div>
       <div id="receiptSuggestionsTools" class="tools spacer" hidden><button type="button" class="button secondary small" onclick="assignSuggestedZones()">Aplicar sugerencias a las líneas sin zona</button><small class="muted">Comprueba las sugerencias antes de registrar.</small></div>
       <div class="form-footer"><button id="receiptSubmit" type="button" class="button" onclick="saveReceipt()">Registrar recepción</button></div>
@@ -290,14 +293,17 @@
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'))}
     function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
     function quarantineStock(){return(state.stock||[]).filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0)}
-    function receiptZoneHint(){$('receiptQuarantineHint').hidden=![...document.querySelectorAll('#receiptLines .line')].some(line=>isQuarantine(line.querySelector('.line-zone')?.value||$('rZone').value));updateReceiptSuggestions()}
+    function receiptZoneHint(){let any=[...document.querySelectorAll('#receiptLines .line')].some(line=>Number(value(line,'quarantineQty')||0)>0);$('receiptQuarantineHint').hidden=!any}
     function isQuarantine(code){return state.zones?.some(z=>z.CODIGO===code&&z.AREA==='CUARENTENA')}
     function renderQuality(){let rows=quarantineStock();$('navQuarantine').textContent=rows.length?'· '+rows.length:'';$('qualityEmpty').hidden=!!rows.length;
-      $('qualityRows').innerHTML=rows.map((x,i)=>'<div class="line"><div class="line-title"><h3>'+esc(x.description)+'</h3><span class="pill pending">BLOQUEADO · '+esc(x.quantity)+' '+esc(x.unit)+'</span></div><p class="muted">'+esc(x.project)+' · '+esc(x.zone)+(x.reference?' · '+esc(x.reference):'')+'</p>'+(['ADMIN','CALIDAD'].includes(state.user?.role)?'<div class="form-grid three"><label class="field"><span>Cantidad que se libera *</span><input type="number" min="0.001" step="0.001" max="'+esc(x.quantity)+'" value="'+esc(x.quantity)+'" id="qAmount'+i+'"></label><label class="field"><span>Destino disponible *</span><select id="qDestination'+i+'">'+(state.zones||[]).filter(z=>z.AREA==='ALMACEN').map(z=>'<option value="'+esc(z.CODIGO)+'">'+esc(z.NOMBRE||z.CODIGO)+'</option>').join('')+'</select></label><label class="field"><span>Motivo / decisión *</span><input id="qReason'+i+'" maxlength="250" placeholder="Comprobación realizada y resultado"></label></div><div class="tools spacer"><button type="button" class="button small" onclick="releaseQuality('+i+')">Liberar material</button></div>':'<p class="muted">Pendiente de liberación por Calidad.</p>')+'</div>').join('')}
-    async function releaseQuality(index){if(actionBusy||!['ADMIN','CALIDAD'].includes(state.user?.role))return;let x=quarantineStock()[index],quantity=$('qAmount'+index).value,reason=$('qReason'+index).value.trim(),destination=$('qDestination'+index).value;
-      if(!x||!positive(quantity)||Number(quantity)>Number(x.quantity)||!reason||!destination){status('Indica cantidad, destino y decisión documentada.','error');return}
-      if(!confirm('¿Liberar '+quantity+' '+x.unit+' de '+x.description+' hacia '+destination+'?'))return;
-      actionBusy=true;pendingRelease=pendingRelease||'op_'+crypto.randomUUID();status('Registrando la decisión de Calidad…','info');try{await call('releaseQuarantine',{batchId:pendingRelease,project:x.project,origin:x.zone,destination,materialId:x.materialId,quantity,reason});pendingRelease='';await afterSave('Material liberado con trazabilidad.','quality')}catch(e){fail(e)}finally{actionBusy=false}}
+      $('qualityRows').innerHTML=rows.map((x,i)=>'<div class="line"><div class="line-title"><h3>'+esc(x.description)+'</h3><span class="pill pending">BLOQUEADO · '+esc(x.quantity)+' '+esc(x.unit)+'</span></div><p class="muted">'+esc(x.project)+' · '+esc(x.zone)+(x.reference?' · '+esc(x.reference):'')+'</p>'+(['ADMIN','CALIDAD'].includes(state.user?.role)?'<div class="form-grid three"><label class="field"><span>Resolución *</span><select id="qAction'+i+'" onchange="qualityActionChanged('+i+')"><option value="LIBERAR">Liberar a stock</option><option value="DEVOLVER">Devolver a proveedor</option><option value="REPARAR">Reparar / reprocesar</option><option value="SUSTITUCION">Solicitar sustitución</option><option value="BAJA">Dar de baja / desechar</option></select></label><label class="field"><span>Cantidad afectada *</span><input type="number" min="0.001" step="0.001" max="'+esc(x.quantity)+'" value="'+esc(x.quantity)+'" id="qAmount'+i+'"></label><label class="field" id="qDestinationField'+i+'"><span>Destino tras liberar *</span><select id="qDestination'+i+'">'+(state.zones||[]).filter(z=>z.AREA==='ALMACEN').map(z=>'<option value="'+esc(z.CODIGO)+'">'+esc(z.NOMBRE||z.CODIGO)+'</option>').join('')+'</select></label></div><label class="field spacer"><span>Motivo / decisión *</span><input id="qReason'+i+'" maxlength="250" placeholder="Resultado de revisión, devolución, reparación, sustitución o baja"></label><div class="tools spacer"><button type="button" class="button small" onclick="resolveQuality('+i+')">Registrar resolución</button></div>':'<p class="muted">Pendiente de resolución por Calidad.</p>')+'</div>').join('')}
+    function qualityActionChanged(index){let action=$('qAction'+index)?.value,field=$('qDestinationField'+index);if(field)field.hidden=action!=='LIBERAR'}
+    async function resolveQuality(index){if(actionBusy||!['ADMIN','CALIDAD'].includes(state.user?.role))return;let x=quarantineStock()[index],quantity=$('qAmount'+index).value,reason=$('qReason'+index).value.trim(),action=$('qAction'+index).value,destination=action==='LIBERAR'?$('qDestination'+index).value:'';
+      if(!x||!positive(quantity)||Number(quantity)>Number(x.quantity)||!reason||(action==='LIBERAR'&&!destination)){status('Indica resolución, cantidad y motivo documentado.','error');return}
+      let labels={LIBERAR:'liberar',DEVOLVER:'devolver al proveedor',REPARAR:'marcar para reparación/reprocesado',SUSTITUCION:'solicitar sustitución de',BAJA:'dar de baja'};
+      if(!confirm('¿'+labels[action]+' '+quantity+' '+x.unit+' de '+x.description+'?'))return;
+      actionBusy=true;pendingRelease=pendingRelease||'op_'+crypto.randomUUID();status('Registrando la resolución de cuarentena…','info');
+      try{await call('resolveQuarantine',{batchId:pendingRelease,action,project:x.project,origin:x.zone,destination,materialId:x.materialId,quantity,reason});pendingRelease='';await afterSave('Resolución de cuarentena registrada con trazabilidad.','quality')}catch(e){fail(e)}finally{actionBusy=false}}
     function filteredStock(){let q=normalize($('search').value),p=$('stockProject').value,z=$('stockZone').value;
       return availableStock().filter(x=>(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
     function renderStock(){let rows=filteredStock();lastVisibleStock=rows;$('stockCount').textContent=rows.length+' posiciones visibles';$('stockEmpty').hidden=rows.length>0;
@@ -398,7 +404,7 @@
       $('zoneSave').disabled=true;status('Guardando la zona…','info');
       try{let r=await call('saveZoneMap',{code,name,category,area,use,points:draftPoints});drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
         let result=await call('bootstrap');state.zones=result.zones;state.zoneMap=result.zoneMap;state.zoneMapSupported=true;
-        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();
+        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();
         setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
         setChoices('mDestination',state.zones,'CODIGO','NOMBRE');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderMap();$('zonePick').value=r.code;loadZoneEditor();selectMapZone(r.code);status('Zona '+r.code+' guardada en el plano.')}
@@ -422,13 +428,19 @@
       let quantity=$('mQuantity').value,destination=$('mDestination').value,zone=state.zones.find(z=>z.CODIGO===destination);
       $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(zone?.AREA==='CAMPA'?' · Pendiente de recepción en campa':zone?.AREA==='CUARENTENA'?' · Quedará bloqueado hasta liberación de Calidad':''):'Selecciona primero un material para preparar el traslado.'}
     function addLine(){let d=document.createElement('div');d.className='line';
-      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200" onchange="updateReceiptSuggestions()"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Recibida *</span><input class="quantity" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field"><span>Esperada</span><input class="expected" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label><label class="field per-line-feature"><span>Ubicación de esta línea</span><select class="line-zone" onchange="receiptZoneHint()"><option value="">Zona general del albarán</option></select></label><label class="field incident"><span>Incidencia de esta línea</span><input class="incident" maxlength="250" placeholder="Indica faltantes o daños si los hay"></label></div><p class="count zone-suggestion" aria-live="polite"></p>';
+      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200" onchange="updateReceiptSuggestions()"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit" onchange="updateReceiptLine(this.closest(\'.line\'))"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Cantidad en albarán *</span><input class="albaranQty" type="number" inputmode="decimal" step="0.001" min="0.001" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>Recibida físicamente *</span><input class="receivedQty" type="number" inputmode="decimal" step="0.001" min="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>A cuarentena</span><input class="quarantineQty" type="number" inputmode="decimal" step="0.001" min="0" value="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field per-line-feature"><span>Ubicación conforme</span><select class="line-zone" onchange="updateReceiptLine(this.closest(\'.line\'))"><option value="">Zona conforme por defecto</option></select></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label></div><div class="quarantine-fields" hidden><label class="field"><span>Zona de cuarentena *</span><select class="quarantine-zone"></select></label><label class="field"><span>Motivo *</span><select class="quarantine-reason"><option value="">Selecciona motivo</option><option>Dañado / roto</option><option>Defecto aparente</option><option>Material incorrecto</option><option>Documentación pendiente</option><option>Pendiente inspección de Calidad</option><option>Otro</option></select></label><label class="field"><span>Detalle</span><input class="incident" maxlength="250" placeholder="Daño observado, falta documental, referencia incorrecta…"></label></div><div class="receipt-result">Introduce cantidades de albarán y recepción física.</div><p class="count zone-suggestion" aria-live="polite"></p>';
       d.querySelectorAll('.per-line-feature,.zone-suggestion').forEach(el=>el.hidden=!state.perLineZonesSupported);
-      $('receiptLines').append(d);fillLineZones(d);numberLines();updateReceiptSuggestions()}
-    function fillLineZones(line){let select=line.querySelector('.line-zone');if(!select)return;let selected=select.value;
-      select.replaceChildren(new Option('Zona general del albarán',''));(state.zones||[]).filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)).forEach(z=>select.add(new Option((z.AREA==='CUARENTENA'?'⚑ ':'')+(z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));select.value=selected;}
-    function updateReceiptSuggestions(){for(const line of document.querySelectorAll('#receiptLines .line')){fillLineZones(line);let hint=line.querySelector('.zone-suggestion'),proposal=proposeZone(line);hint.textContent=proposal?'Sugerencia: '+proposal.name+' ('+proposal.reason+'). Puedes elegirla en «Ubicación de esta línea».':'Sin sugerencia fiable; se aplicará la zona general si no eliges otra.'}receiptZoneHintDisplay()}
-    function receiptZoneHintDisplay(){$('receiptQuarantineHint').hidden=![...document.querySelectorAll('#receiptLines .line')].some(line=>isQuarantine(line.querySelector('.line-zone')?.value||$('rZone').value))}
+      $('receiptLines').append(d);fillLineZones(d);numberLines();updateReceiptLine(d);updateReceiptSuggestions()}
+    function fillLineZones(line){let select=line.querySelector('.line-zone'),selected=select?.value||'';if(select){select.replaceChildren(new Option('Zona conforme por defecto',''));(state.zones||[]).filter(z=>z.AREA==='ALMACEN').forEach(z=>select.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));select.value=selected}
+      let q=line.querySelector('.quarantine-zone'),qSelected=q?.value||'';if(q){q.replaceChildren();(state.zones||[]).filter(z=>z.AREA==='CUARENTENA').forEach(z=>q.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));if(qSelected&&[...q.options].some(o=>o.value===qSelected))q.value=qSelected}}
+    function updateReceiptLine(line){if(!line)return;let alb=Number(value(line,'albaranQty')),received=Number(value(line,'receivedQty')),q=Number(value(line,'quarantineQty')||0),unit=value(line,'unit')||'ud',result=line.querySelector('.receipt-result'),qbox=line.querySelector('.quarantine-fields');
+      let haveAlb=Number.isFinite(alb)&&alb>0,haveReceived=Number.isFinite(received)&&received>=0,validQ=Number.isFinite(q)&&q>=0&&(!haveReceived||q<=received),accepted=haveReceived&&validQ?Math.max(0,received-q):0;
+      qbox.hidden=!(validQ&&q>0);receiptZoneHint();
+      if(!haveAlb||!haveReceived){result.className='receipt-result';result.textContent='Introduce cantidades de albarán y recepción física.';return}
+      if(!validQ){result.className='receipt-result warning';result.textContent='La cantidad en cuarentena no puede superar lo recibido físicamente.';return}
+      let diff=Math.abs(alb-received)>0.0005;result.className='receipt-result'+(diff?' warning':'');result.textContent='Conforme: '+accepted+' '+unit+' · Cuarentena: '+q+' '+unit+(diff?' · DIFERENCIA: albarán '+alb+' '+unit+' / físico '+received+' '+unit:' · Albarán y recepción física coinciden')}
+    function updateReceiptSuggestions(){for(const line of document.querySelectorAll('#receiptLines .line')){fillLineZones(line);let hint=line.querySelector('.zone-suggestion'),proposal=proposeZone(line);hint.textContent=proposal?'Sugerencia ubicación conforme: '+proposal.name+' ('+proposal.reason+').':'Sin sugerencia fiable; se aplicará la zona conforme por defecto.';updateReceiptLine(line)}}
+    function receiptZoneHintDisplay(){receiptZoneHint()}
     function proposeZone(line){let project=$('rProject').value,reference=value(line,'reference'),description=value(line,'description'),category=value(line,'category'),supplier=$('supplier').value.trim();
       let zones=(state.zones||[]).filter(z=>z.AREA==='ALMACEN'),stock=availableStock(),normalizeRef=s=>normalize(s).replace(/\s+/g,'');
       let same=stock.filter(x=>x.project===project&&reference&&normalizeRef(x.reference)===normalizeRef(reference));
@@ -446,13 +458,17 @@
       if(!material){updateReceiptSuggestions();return}let line=input.closest('.line');line.querySelector('.description').value=material.DESCRIPCION;line.querySelector('.manufacturer').value=material.FABRICANTE||'';line.querySelector('.category').value=material.CATEGORIA||'';
       let unit=line.querySelector('.unit');if([...unit.options].some(o=>o.value===material.UNIDAD))unit.value=material.UNIDAD;updateReceiptSuggestions()}
     function positive(value){let n=Number(value);return Number.isFinite(n)&&n>0&&Math.round(n*1000)===n*1000}
+    function nonNegative(value){let n=Number(value);return Number.isFinite(n)&&n>=0&&Math.round(n*1000)===n*1000}
     function value(line,cls){let control=line.querySelector('input.'+cls+', select.'+cls+', textarea.'+cls);return control?control.value.trim():''}
     function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
-      if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, almacén, proveedor y número de albarán o factura.');
+      if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, zona conforme, proveedor y número de albarán o factura.');
       if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
-      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','quantity','expected','incident','category'].map(k=>[k,value(line,k)]));item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
-        if(!item.description||!positive(item.quantity)||item.expected&&!positive(item.expected))throw Error('Revisa la descripción y las cantidades de la línea '+(i+1)+'.');
-        if(isQuarantine(item.zone)&&!item.incident)throw Error('Indica el motivo de cuarentena en la línea '+(i+1)+'.');return item});
+      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','albaranQty','receivedQty','quarantineQty','incident','category'].map(k=>[k,value(line,k)]));
+        if(!item.description||!positive(item.albaranQty)||!nonNegative(item.receivedQty)||!nonNegative(item.quarantineQty))throw Error('Revisa descripción y cantidades de la línea '+(i+1)+'.');
+        let received=Number(item.receivedQty),q=Number(item.quarantineQty);if(q>received)throw Error('La cuarentena supera lo recibido físicamente en la línea '+(i+1)+'.');
+        item.acceptedQty=String(Math.round((received-q)*1000)/1000);item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
+        item.quarantineZone=line.querySelector('.quarantine-zone')?.value||'';item.quarantineReason=line.querySelector('.quarantine-reason')?.value||'';
+        if(q>0&&(!item.quarantineZone||!item.quarantineReason))throw Error('Selecciona zona y motivo de cuarentena en la línea '+(i+1)+'.');return item});
       return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
     function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
       let material=availableStock().find(x=>x.project===project&&x.zone===origin&&x.materialId===id);
@@ -463,7 +479,7 @@
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
       try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
-        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
+        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderSummary();renderStock();renderMoves();renderMap();renderQuality();available();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
@@ -471,7 +487,7 @@
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),p.lines.some(line=>isQuarantine(line.zone))?'quality':'stock')}
+        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'),Number(result.quarantineTotal)>0?'quality':'stock')}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}
@@ -498,7 +514,7 @@
         $('userName').textContent=state.user.name;$('userRole').textContent=state.user.role;
         document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
         setChoices('rProject',state.projects,'CODIGO','CODIGO');setChoices('mProject',state.projects,'CODIGO','CODIGO');
-        setChoices('rZone',state.zones.filter(z=>['ALMACEN','CUARENTENA'].includes(z.AREA)),'CODIGO','NOMBRE');receiptZoneHint();
+        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();
         setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         addLine();await refresh();view('stock',false)}
       catch(e){$('app').hidden=true;$('login').hidden=false;$('identity').hidden=true;$('loginError').textContent=e.message;$('loginError').hidden=false}}
