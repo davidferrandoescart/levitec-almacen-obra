@@ -1,44 +1,312 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Almacén de obra</title>
-<style>:root{font-family:system-ui,sans-serif;color:#17324d;background:#f3f6f8}*{box-sizing:border-box}body{margin:0}header{background:#17324d;color:white;padding:18px}h1{margin:0;font-size:21px}main{max-width:1100px;margin:auto;padding:16px}section{background:white;padding:16px;margin:12px 0;border-radius:12px}nav{display:flex;gap:8px;overflow:auto}button{background:#116e9c;color:white;border:0;border-radius:8px;padding:10px 14px;font:inherit;cursor:pointer}button.secondary{background:#dae8ef;color:#17324d}label{display:block;margin:8px 0 3px;font-size:13px;font-weight:600}input,select{width:100%;padding:10px;border:1px solid #bbcbd5;border-radius:7px;font:inherit}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}.line{border:1px solid #d7e0e5;padding:10px;border-radius:8px;margin:10px 0}.scroll{overflow:auto}table{min-width:650px;width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px;border-bottom:1px solid #e4eaf0;font-size:14px}.error{color:#ae182d}small{color:#5a7180}</style></head>
-<body><header><h1>Almacén de obra</h1></header><main><section id="login"><p>Accede con tu cuenta Google autorizada.</p><div id="signin"></div></section><div id="app" hidden><small id="who"></small><nav><button onclick="view('stock')">Stock</button><button onclick="view('moves')">Movimientos</button><button class="write" onclick="view('receipt')">Recepción</button><button class="write" onclick="view('transfer')">Mover</button></nav><p id="status"></p>
-<section id="stock"><h2>Existencias</h2><input id="search" placeholder="Buscar material, referencia, proyecto o zona" oninput="renderStock()"><div class="scroll"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Zona</th><th>Disponible</th></tr></thead><tbody id="stockRows"></tbody></table></div></section>
-<section id="moves" hidden><h2>Movimientos recientes</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Lote</th><th>Material</th><th>Cantidad</th><th>Origen → destino</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="moveRows"></tbody></table></div></section>
-<section id="receipt" hidden><h2>Nueva recepción</h2><div class="grid"><div><label>Proyecto</label><select id="rProject"></select></div><div><label>Zona de almacén</label><select id="rZone"></select></div><div><label>Proveedor</label><input id="supplier"></div><div><label>Nº albarán o factura</label><input id="document"></div></div><label>Enlace al documento (opcional)</label><input id="documentUrl" placeholder="https://..."><label>Observaciones</label><input id="rNote"><div id="receiptLines"></div><button class="secondary" onclick="addLine()">+ Línea</button> <button onclick="saveReceipt()">Registrar recepción</button></section>
-<section id="transfer" hidden><h2>Mover material</h2><div class="grid"><div><label>Proyecto</label><select id="mProject" onchange="available()"></select></div><div><label>Origen</label><select id="mOrigin" onchange="available()"></select></div><div><label>Destino</label><select id="mDestination"></select></div></div><label>Material disponible</label><select id="mMaterial"></select><label>Cantidad</label><input id="mQuantity" type="number" min="0.001" step="0.001"><label>Motivo</label><input id="mNote"><p><button id="moveSubmit" onclick="saveMove()">Registrar movimiento</button></p></section></div></main>
-<script>
-// Configurar estos dos valores antes de publicar. El origen autorizado se define en Apps Script.
-const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
-const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
-const SCRIPT_ORIGIN='https://script.google.com';
-let credential='',state={},pendingReceipt='',pendingMove='',moveSaving=false;
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function status(s,error=false){$('status').textContent=s;$('status').className=error?'error':''}
-function call(action,data={}){return new Promise((resolve,reject)=>{
-  const requestId='req_'+crypto.randomUUID(), frame=document.createElement('iframe'), form=document.createElement('form');
-  frame.name='frame_'+requestId;frame.hidden=true;form.method='POST';form.action=SCRIPT_URL;form.target=frame.name;form.hidden=true;
-  const finish=()=>{clearTimeout(timer);window.removeEventListener('message',onMessage);frame.remove();form.remove()};
-  const onMessage=e=>{let origin;try{origin=new URL(e.origin)}catch{return}
-    if(origin.protocol!=='https:' || !(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
-    const p=e.data;if(!p||p.source!=='ALMACEN_OBRA'||p.requestId!==requestId)return;
-    finish();p.ok?resolve(p.result):reject(Error(p.message||'Error del servidor'))};
-  const timer=setTimeout(()=>{finish();reject(Error('No hay respuesta del servidor. Comprueba el despliegue y la conexión.'))},30000);
-  window.addEventListener('message',onMessage);
-  Object.entries({requestId,action,credential,data:JSON.stringify(data)}).forEach(([key,value])=>{let i=document.createElement('input');i.type='hidden';i.name=key;i.value=value;form.appendChild(i)});
-  document.body.append(frame,form);form.submit();
-})}
-function choices(id,items,key,label){$(id).replaceChildren(...items.map(item=>{let o=document.createElement('option');o.value=item[key];o.textContent=item[label]||item[key];return o}))}
-function view(id){['stock','moves','receipt','transfer'].forEach(x=>$(x).hidden=x!==id);if(id==='moves')refresh()}
-function renderStock(){let q=$('search').value.toLocaleLowerCase('es');$('stockRows').innerHTML=(state.stock||[]).filter(x=>[x.description,x.reference,x.project,x.zone].join(' ').toLocaleLowerCase('es').includes(q)).map(x=>`<tr><td>${esc(x.description)}</td><td>${esc(x.reference)}</td><td>${esc(x.project)}</td><td>${esc(x.zone)}</td><td>${esc(x.quantity)} ${esc(x.unit)}</td></tr>`).join('')||'<tr><td colspan="5">Sin existencias.</td></tr>'}
-function renderMoves(){let seen=new Set();$('moveRows').innerHTML=(state.movements||[]).map(x=>{let camp=state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA');let first=!seen.has(x.ID_LOTE);let button=camp&&x.ESTADO==='PENDIENTE'&&first?`<button data-batch="${esc(x.ID_LOTE)}" onclick="confirmMove(this.dataset.batch)">Recibido</button>`:'';if(x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&first&&state.user.role==='ADMIN')button+=` <button class="secondary" data-batch="${esc(x.ID_LOTE)}" onclick="cancelMovement(this.dataset.batch)">Anular</button>`;seen.add(x.ID_LOTE);return `<tr><td>${esc(x.FECHA.slice(0,16).replace('T',' '))}</td><td>${esc(x.ID_LOTE.slice(0,8))}</td><td>${esc(x.DESCRIPCION)}</td><td>${esc(x.CANTIDAD)} ${esc(x.UNIDAD)}</td><td>${esc(x.ORIGEN||'Proveedor')} → ${esc(x.DESTINO)}</td><td>${esc(x.ESTADO)}</td><td>${button}</td></tr>`}).join('')||'<tr><td colspan="7">Sin movimientos.</td></tr>'}
-function available(){let p=$('mProject').value,z=$('mOrigin').value;choices('mMaterial',(state.stock||[]).filter(x=>x.project===p&&x.zone===z).map(x=>({id:x.materialId,label:`${x.description} — ${x.quantity} ${x.unit}`})),'id','label')}
-function addLine(){let d=document.createElement('div');d.className='line grid';d.innerHTML='<div><label>Descripción</label><input class="description"></div><div><label>Referencia</label><input class="reference"></div><div><label>Fabricante</label><input class="manufacturer"></div><div><label>Unidad</label><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></div><div><label>Cantidad recibida</label><input class="quantity" type="number" step="0.001" min="0.001"></div><div><label>Cantidad esperada</label><input class="expected" type="number" step="0.001" min="0.001"></div><div><label>Incidencia</label><input class="incident"></div><div><label>&nbsp;</label><button class="secondary" onclick="this.closest(\'.line\').remove()">Quitar</button></div>';$('receiptLines').append(d)}
-function value(d,cls){return d.querySelector('.'+cls).value.trim()}
-async function saveReceipt(){let lines=[...document.querySelectorAll('#receiptLines .line')].map(d=>Object.fromEntries(['description','reference','manufacturer','unit','quantity','expected','incident'].map(k=>[k,value(d,k)])));let p={batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,zone:$('rZone').value,supplier:$('supplier').value,document:$('document').value,documentUrl:$('documentUrl').value,note:$('rNote').value,lines};pendingReceipt=p.batchId;try{status('Guardando...');let r=await call('createReceipt',p);pendingReceipt='';status(`Recepción ${r.batchId.slice(0,8)}: ${r.lines} líneas registradas.`);$('receiptLines').replaceChildren();addLine();await refresh();view('stock')}catch(e){status(e.message,true)}}
-async function saveMove(){if(moveSaving)return;moveSaving=true;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Guardando...';let p={batchId:pendingMove||'op_'+crypto.randomUUID(),project:$('mProject').value,origin:$('mOrigin').value,destination:$('mDestination').value,note:$('mNote').value,lines:[{materialId:$('mMaterial').value,quantity:$('mQuantity').value}]};pendingMove=p.batchId;try{status('Guardando...');let r=await call('moveStock',p);pendingMove='';status(`Movimiento ${r.batchId.slice(0,8)} registrado.`);await refresh();view('moves')}catch(e){status(e.message,true)}finally{moveSaving=false;$('moveSubmit').disabled=false;$('moveSubmit').textContent='Registrar movimiento'}}
-async function confirmMove(batchId){try{await call('confirmCamp',{batchId});status('Recepción en campa confirmada.');await refresh();view('moves')}catch(e){status(e.message,true)}}
-async function cancelMovement(batchId){if(!confirm(`¿Anular el movimiento ${batchId.slice(0,8)}?`))return;try{status('Anulando movimiento...');await call('cancelMove',{batchId});status(`Movimiento ${batchId.slice(0,8)} anulado.`);await refresh();view('moves')}catch(e){status(e.message,true)}}
-async function refresh(){let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;renderStock();renderMoves();available()}
-async function signedIn(r){credential=r.credential;try{state=await call('bootstrap');$('login').hidden=true;$('app').hidden=false;$('who').textContent=`${state.user.name} · ${state.user.role}`;document.querySelectorAll('.write').forEach(b=>b.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));choices('rProject',state.projects,'CODIGO','CODIGO');choices('mProject',state.projects,'CODIGO','CODIGO');choices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');choices('mOrigin',state.zones,'CODIGO','NOMBRE');choices('mDestination',state.zones,'CODIGO','NOMBRE');addLine();await refresh()}catch(e){$('login').insertAdjacentHTML('beforeend',`<p class="error">${esc(e.message)}</p>`)}}
-function initGoogle(){google.accounts.id.initialize({client_id:CLIENT_ID,callback:signedIn,ux_mode:'popup'});google.accounts.id.renderButton($('signin'),{theme:'outline',size:'large',text:'signin_with',width:250})}
-</script><script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14273b">
+  <title>Almacén de obra · Levitec</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#14273b;background:#f4f6f8;font-synthesis:none}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    button:disabled{opacity:.54;cursor:wait}
+    button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #8ad0e4;outline-offset:2px}
+    [hidden]{display:none!important}
+    .topbar{background:#14273b;color:#fff;border-bottom:3px solid #17a8aa}
+    .topbar-inner{max-width:1300px;margin:auto;padding:19px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}
+    .brand-mark{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:11px;background:#17a8aa;color:#fff;font-weight:800;font-size:20px}
+    .brand strong{font-size:17px;letter-spacing:-.025em}
+    .brand small{display:block;color:#bed0de;font-size:11px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;margin-bottom:2px}
+    .identity{font-size:12px;color:#dbe6ee;text-align:right}
+    .identity b{display:block;font-size:13px;color:#fff}
+    .layout{max-width:1300px;margin:auto;padding:28px}
+    .pagehead{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin:4px 0 22px}
+    .eyebrow{margin:0 0 5px;color:#177d86;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.15em}
+    h1{margin:0;font-size:clamp(26px,3vw,34px);letter-spacing:-.045em;line-height:1.15}
+    h2{margin:0;font-size:20px;letter-spacing:-.03em}
+    h3{margin:0;font-size:15px}
+    .muted{color:#5e7082}
+    .intro{margin:8px 0 0;color:#5e7082;font-size:14px;line-height:1.5}
+    .button{display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:41px;border:1px solid #167985;border-radius:9px;padding:9px 15px;background:#117b86;color:white;font-weight:700;font-size:13px;white-space:nowrap;transition:background .15s,border-color .15s}
+    .button:hover:not(:disabled){background:#075c68}
+    .button.secondary{background:#fff;color:#244458;border-color:#c8d5de}
+    .button.secondary:hover:not(:disabled){background:#eaf1f4}
+    .button.ghost{border-color:transparent;background:transparent;color:#20637b}
+    .button.ghost:hover:not(:disabled){background:#edf3f6}
+    .button.danger{background:#fff;color:#a63232;border-color:#efc9c9}
+    .button.danger:hover:not(:disabled){background:#fff0f0}
+    .button.small{min-height:32px;padding:5px 10px;font-size:12px}
+    .tabs{display:flex;gap:7px;border-bottom:1px solid #dce4e9;margin-bottom:22px;overflow-x:auto;scrollbar-width:thin}
+    .tab{flex:none;border:0;border-bottom:3px solid transparent;background:transparent;padding:11px 16px 13px;color:#5d7182;font-size:13px;font-weight:750}
+    .tab:hover{color:#117b86}
+    .tab.active{border-bottom-color:#16a5a7;color:#123b54}
+    .card{background:#fff;border:1px solid #e2e9ed;border-radius:14px;box-shadow:0 4px 18px #14273b08}
+    .panel{padding:24px}
+    .panel + .panel{margin-top:16px}
+    .panel-top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:22px}
+    .panel-top p{margin:5px 0 0;font-size:13px;color:#64798a}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+    .stat{padding:17px 18px;background:#fff;border:1px solid #e2e9ed;border-radius:12px}
+    .stat span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64798a;font-weight:750}
+    .stat strong{display:block;font-size:27px;line-height:1.25;letter-spacing:-.05em;margin-top:5px}
+    .stat small{display:block;color:#718494;font-size:11px;margin-top:2px}
+    .stat.alert strong{color:#ba7820}
+    .notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:10px;background:#eaf6f4;color:#235b53;font-size:13px;line-height:1.4;margin:0 0 18px}
+    .notice.warning{background:#fff7e9;color:#805711}
+    .flash{border-radius:10px;padding:12px 14px;margin:0 0 18px;font-size:13px;line-height:1.4;font-weight:650;background:#eaf6f4;color:#235b53;border:1px solid #c4e4db}
+    .flash.error{background:#fff0f0;border-color:#f3d1d1;color:#a33434}
+    .flash.info{background:#edf5fa;border-color:#cee5f2;color:#245a79}
+    .tools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:16px}
+    .field{display:block;min-width:0}
+    .field span{display:block;margin-bottom:6px;font-size:12px;font-weight:750;color:#29455c}
+    .field input,.field select,.field textarea{width:100%;min-height:41px;border:1px solid #cbd7e0;border-radius:8px;padding:9px 11px;background:#fff;color:#183248;outline:none}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:#149598;box-shadow:0 0 0 3px #17a8aa20}
+    .field input::placeholder,.field textarea::placeholder{color:#8799a7}
+    .field textarea{min-height:77px;resize:vertical}
+    .field small{display:block;font-size:11px;color:#708292;margin-top:5px;line-height:1.35}
+    .tools .search{flex:2 1 280px}
+    .tools .filter{flex:1 1 165px}
+    .tools .button{margin-bottom:1px}
+    .count{margin:0 0 7px;font-size:12px;color:#64798a}
+    .table-wrap{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;min-width:760px}
+    th{text-align:left;background:#f7f9fa;font-size:11px;text-transform:uppercase;letter-spacing:.055em;color:#697e8e;padding:12px 14px;white-space:nowrap}
+    td{padding:14px;border-top:1px solid #e9eef1;font-size:13px;vertical-align:middle;color:#244258}
+    td strong{color:#172f43;font-weight:750}
+    td small{display:block;color:#6a7f8e;margin-top:3px;font-size:11px}
+    .right{text-align:right}
+    .qty{font-variant-numeric:tabular-nums;font-weight:800;color:#153f52;white-space:nowrap}
+    .pill{display:inline-flex;align-items:center;border-radius:99px;padding:5px 9px;font-size:11px;font-weight:800;white-space:nowrap;background:#e9f1f5;color:#486577}
+    .pill.pending{background:#fff3df;color:#94620e}
+    .pill.received{background:#e7f6ee;color:#28764f}
+    .pill.cancelled{background:#f2f3f5;color:#718091}
+    .actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+    .empty{padding:40px 16px;text-align:center;color:#667e8f;font-size:13px}
+    .empty b{display:block;color:#30495c;font-size:15px;margin-bottom:5px}
+    .form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .form-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .form-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .span2{grid-column:span 2}
+    .spacer{margin-top:17px}
+    .divider{height:1px;background:#e9eef1;margin:23px 0}
+    .form-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:20px;flex-wrap:wrap}
+    .line{border:1px solid #dce6eb;border-radius:11px;background:#fcfdfd;padding:16px;margin:11px 0}
+    .line-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
+    .line-grid{display:grid;grid-template-columns:2fr 1.2fr 1.2fr .8fr 1fr 1fr;gap:12px}
+    .line-grid .incident{grid-column:span 3}
+    .summary{padding:14px 16px;border-radius:10px;background:#edf5f6;margin-top:16px;color:#305e68;font-size:13px;line-height:1.5}
+    .login-wrap{min-height:calc(100vh - 85px);display:grid;place-items:center;padding:22px}
+    .login-card{width:min(100%,460px);padding:33px}
+    .login-icon{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:#e3f5f2;color:#117b86;font-size:26px;margin-bottom:19px}
+    .login-card h1{font-size:27px}
+    .login-card p{font-size:14px;color:#5e7082;line-height:1.55;margin:9px 0 21px}
+    .login-card .flash{margin:18px 0 0}
+    footer{padding:24px 0 8px;color:#8b9ba7;font-size:11px}
+    @media(max-width:980px){.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.line-grid .incident{grid-column:span 2}}
+    @media(max-width:640px){.topbar-inner{padding:15px 16px}.layout{padding:18px 12px}.pagehead{display:block}.pagehead .button{margin-top:12px}.panel{padding:18px 13px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:23px}.tab{padding:11px 12px}.form-grid,.form-grid.two,.form-grid.three,.line-grid{grid-template-columns:1fr}.span2,.line-grid .incident{grid-column:auto}.form-footer .button{flex:1}.tools .filter{flex:1 1 43%}.table-wrap{overflow:visible}table{min-width:0}thead{display:none}tbody,tr,td{display:block}tr{border:1px solid #e2e9ed;border-radius:10px;margin:10px 0;padding:8px}td{border:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 8px;text-align:right}td:before{content:attr(data-label);color:#728697;font-size:11px;font-weight:750;text-transform:uppercase;text-align:left}td .actions{max-width:75%}td small{text-align:right}.empty{padding:25px 10px}}
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">L</div><div><small>Levitec · Operaciones</small><strong>Almacén de obra</strong></div></div>
+    <div id="identity" class="identity" hidden><b id="userName"></b><span id="userRole"></span></div>
+  </div></header>
+  <div id="login" class="login-wrap"><section class="card login-card"><div class="login-icon" aria-hidden="true">▣</div><p class="eyebrow">Control de materiales</p><h1>Todo el material, bajo control.</h1><p>Consulta existencias, registra entradas y sigue los traslados entre almacén y obra.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
+  <main id="app" class="layout" hidden>
+    <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" onclick="refresh(true)" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
+    <nav class="tabs" aria-label="Secciones">
+      <button class="tab active" type="button" data-view="stock" onclick="view('stock')">Existencias</button>
+      <button class="tab" type="button" data-view="moves" onclick="view('moves')">Movimientos <span id="navPending"></span></button>
+      <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
+      <button class="tab write" type="button" data-view="transfer" onclick="view('transfer')">Mover material</button>
+    </nav>
+    <div id="status" class="flash" role="status" aria-live="polite" hidden></div>
+    <section id="stock">
+      <div class="stats" aria-label="Resumen del almacén">
+        <div class="stat"><span>Referencias</span><strong id="statReferences">0</strong><small>Materiales con existencias</small></div>
+        <div class="stat"><span>Ubicaciones</span><strong id="statZones">0</strong><small>Zonas con material</small></div>
+        <div class="stat"><span>Proyectos</span><strong id="statProjects">0</strong><small>Con stock registrado</small></div>
+        <div class="stat alert"><span>Pendientes en campa</span><strong id="statPending">0</strong><small>Lotes por confirmar</small></div>
+      </div>
+      <div id="transitNote" class="notice warning" hidden>↗ <span>Hay movimientos pendientes de recepción en campa. Esas cantidades se muestran en el historial y no figuran como disponibles en el destino hasta confirmarlas.</span></div>
+      <div class="card panel">
+        <div class="panel-top"><div><h2>Existencias</h2><p>Busca y filtra para localizar material rápidamente.</p></div></div>
+        <div class="tools">
+          <label class="field search"><span>Buscar material</span><input id="search" type="search" placeholder="Descripción, referencia o zona…" oninput="renderStock()"></label>
+          <label class="field filter"><span>Proyecto</span><select id="stockProject" onchange="renderStock()"><option value="">Todos</option></select></label>
+          <label class="field filter"><span>Ubicación</span><select id="stockZone" onchange="renderStock()"><option value="">Todas</option></select></label>
+          <button type="button" class="button secondary" onclick="exportStock()">↓ &nbsp;Exportar CSV</button>
+        </div>
+        <p id="stockCount" class="count"></p>
+        <div class="table-wrap"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Ubicación</th><th class="right">Disponible</th></tr></thead><tbody id="stockRows"></tbody></table></div>
+        <div id="stockEmpty" class="empty" hidden><b>Sin resultados</b>Ajusta los filtros o registra una recepción.</div>
+      </div>
+    </section>
+    <section id="moves" hidden>
+      <div class="card panel">
+        <div class="panel-top"><div><h2>Historial de movimientos</h2><p>Últimos 100 registros. Los pendientes en campa necesitan confirmación.</p></div></div>
+        <div class="tools">
+          <label class="field search"><span>Buscar movimiento</span><input id="moveSearch" type="search" placeholder="Material, lote, proyecto o documento…" oninput="renderMoves()"></label>
+          <label class="field filter"><span>Estado</span><select id="moveFilter" onchange="renderMoves()"><option value="">Todos</option><option>PENDIENTE</option><option>RECIBIDO</option><option>REGISTRADO</option><option>ANULADO</option></select></label>
+        </div>
+        <p id="moveCount" class="count"></p>
+        <div class="table-wrap"><table><thead><tr><th>Fecha / lote</th><th>Material</th><th class="right">Cantidad</th><th>Ruta</th><th>Estado</th><th class="right">Acciones</th></tr></thead><tbody id="moveRows"></tbody></table></div>
+        <div id="moveEmpty" class="empty" hidden><b>Sin movimientos</b>No hay registros con esos filtros.</div>
+      </div>
+    </section>
+    <section id="receipt" class="card panel" hidden>
+      <div class="panel-top"><div><h2>Registrar recepción</h2><p>El material entrará en el almacén seleccionado. Los campos con * son obligatorios.</p></div></div>
+      <div class="form-grid">
+        <label class="field"><span>Proyecto *</span><select id="rProject"></select></label>
+        <label class="field"><span>Zona de almacén *</span><select id="rZone"></select></label>
+        <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora"></label>
+        <label class="field"><span>Albarán o factura *</span><input id="document" placeholder="Número de documento"></label>
+      </div>
+      <div class="form-grid two spacer">
+        <label class="field"><span>Enlace al documento</span><input id="documentUrl" type="url" placeholder="https://…"></label>
+        <label class="field"><span>Observaciones generales</span><input id="rNote" placeholder="Información adicional de la entrega"></label>
+      </div>
+      <div class="divider"></div>
+      <div class="panel-top"><div><h3>Material recibido</h3><p>Puedes incluir varias referencias en el mismo albarán.</p></div><button type="button" class="button secondary small" onclick="addLine()">+ Añadir línea</button></div>
+      <div id="receiptLines"></div>
+      <div class="form-footer"><button id="receiptSubmit" type="button" class="button" onclick="saveReceipt()">Registrar recepción</button></div>
+    </section>
+    <section id="transfer" class="card panel" hidden>
+      <div class="panel-top"><div><h2>Mover material</h2><p>Selecciona la ubicación de origen para ver su material disponible.</p></div></div>
+      <div class="form-grid three">
+        <label class="field"><span>Proyecto *</span><select id="mProject" onchange="available()"></select></label>
+        <label class="field"><span>Origen *</span><select id="mOrigin" onchange="available()"></select></label>
+        <label class="field"><span>Destino *</span><select id="mDestination" onchange="renderMoveSummary()"></select></label>
+      </div>
+      <div class="form-grid two spacer">
+        <label class="field"><span>Material disponible *</span><select id="mMaterial" onchange="renderMoveSummary()"></select><small id="materialHint"></small></label>
+        <label class="field"><span>Cantidad *</span><input id="mQuantity" type="number" inputmode="decimal" min="0.001" step="0.001" oninput="renderMoveSummary()"></label>
+      </div>
+      <div class="spacer"><label class="field"><span>Motivo u observaciones</span><textarea id="mNote" placeholder="Por ejemplo: traslado para montaje en zona de obra"></textarea></label></div>
+      <div id="moveSummary" class="summary" aria-live="polite"></div>
+      <div class="form-footer"><button id="moveSubmit" type="button" class="button" onclick="saveMove()">Registrar movimiento</button></div>
+    </section>
+    <footer>Almacén de obra · Los registros quedan trazados en el historial de movimientos.</footer>
+  </main>
+  <script>
+    const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
+    const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
+    let credential='',state={},pendingReceipt='',pendingMove='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[];
+    const $=id=>document.getElementById(id);
+    const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function status(message,type='success'){let el=$('status');el.textContent=message;el.className='flash '+type;el.hidden=!message}
+    function fail(error){status(error.message||String(error),'error')}
+    function call(action,data={}){return new Promise((resolve,reject)=>{
+      const requestId='req_'+crypto.randomUUID(),frame=document.createElement('iframe'),form=document.createElement('form');
+      frame.name='frame_'+requestId;frame.hidden=true;form.method='POST';form.action=SCRIPT_URL;form.target=frame.name;form.hidden=true;
+      const finish=()=>{clearTimeout(timer);window.removeEventListener('message',onMessage);frame.remove();form.remove()};
+      const onMessage=e=>{let origin;try{origin=new URL(e.origin)}catch{return}
+        if(origin.protocol!=='https:'||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
+        const p=e.data;if(!p||p.source!=='ALMACEN_OBRA'||p.requestId!==requestId)return;
+        finish();p.ok?resolve(p.result):reject(Error(p.message||'Error del servidor'))};
+      const timer=setTimeout(()=>{finish();reject(Error('No hay respuesta del servidor. Comprueba la conexión antes de repetir la operación.'))},30000);
+      window.addEventListener('message',onMessage);
+      Object.entries({requestId,action,credential,data:JSON.stringify(data)}).forEach(([key,value])=>{let i=document.createElement('input');i.type='hidden';i.name=key;i.value=value;form.appendChild(i)});
+      document.body.append(frame,form);form.submit();
+    })}
+    function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
+      items.forEach(item=>el.add(new Option(item[label]||item[key],item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
+    const pages={stock:['Existencias','Material disponible por proyecto y ubicación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
+    function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
+      activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
+      $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(id==='moves'&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
+    const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'))}
+    function availableStock(){let pending={};pendingEvents().forEach(e=>{let key=[e.PROYECTO,e.DESTINO,e.MATERIAL_ID].join('\u001f');pending[key]=(pending[key]||0)+Number(e.CANTIDAD)});
+      return(state.stock||[]).map(x=>({...x,quantity:Math.max(0,Math.round((Number(x.quantity)-(pending[[x.project,x.zone,x.materialId].join('\u001f')]||0))*1000)/1000)})).filter(x=>x.quantity>0)}
+    function filteredStock(){let q=normalize($('search').value),p=$('stockProject').value,z=$('stockZone').value;
+      return availableStock().filter(x=>(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
+    function renderStock(){let rows=filteredStock();lastVisibleStock=rows;$('stockCount').textContent=rows.length+' posiciones visibles';$('stockEmpty').hidden=rows.length>0;
+      $('stockRows').innerHTML=rows.map(x=>'<tr><td data-label="Material"><strong>'+esc(x.description)+'</strong></td><td data-label="Referencia">'+esc(x.reference||'—')+'</td><td data-label="Proyecto">'+esc(x.project)+'</td><td data-label="Ubicación">'+esc(x.zone)+'</td><td data-label="Disponible" class="right"><span class="qty">'+esc(x.quantity)+' '+esc(x.unit)+'</span></td></tr>').join('')}
+    function renderMoves(){let q=normalize($('moveSearch').value),f=$('moveFilter').value,seen=new Set(),rows=(state.movements||[]).filter(x=>(!f||x.ESTADO===f)&&normalize([x.DESCRIPCION,x.ID_LOTE,x.PROYECTO,x.ORIGEN,x.DESTINO,x.DOCUMENTO_NUMERO,x.PROVEEDOR].join(' ')).includes(q));
+      $('moveCount').textContent=rows.length+' movimientos visibles';$('moveEmpty').hidden=rows.length>0;
+      $('moveRows').innerHTML=rows.map(x=>{let first=!seen.has(x.ID_LOTE),camp=state.zones.some(z=>z.CODIGO===x.DESTINO&&z.AREA==='CAMPA'),buttons='';
+        if(first&&x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'){
+          if(camp)buttons+='<button type="button" class="button small" data-batch="'+esc(x.ID_LOTE)+'" onclick="confirmMove(this.dataset.batch)">Confirmar</button>';
+          if(state.user.role==='ADMIN')buttons+='<button type="button" class="button danger small" data-batch="'+esc(x.ID_LOTE)+'" onclick="cancelMovement(this.dataset.batch)">Anular</button>'}
+        seen.add(x.ID_LOTE);let kind=x.ESTADO==='PENDIENTE'?'pending':x.ESTADO==='RECIBIDO'?'received':x.ESTADO==='ANULADO'?'cancelled':'';
+        let details=[x.PROVEEDOR,x.DOCUMENTO_NUMERO].filter(Boolean).join(' · '),date=String(x.FECHA||'').slice(0,16).replace('T',' ');
+        return '<tr><td data-label="Fecha / lote">'+esc(date)+'<small>'+esc(x.ID_LOTE.slice(0,12))+'</small></td><td data-label="Material"><strong>'+esc(x.DESCRIPCION)+'</strong>'+(details?'<small>'+esc(details)+'</small>':'')+'</td><td data-label="Cantidad" class="right"><span class="qty">'+esc(x.CANTIDAD)+' '+esc(x.UNIDAD)+'</span></td><td data-label="Ruta">'+esc(x.ORIGEN||'Proveedor')+' → '+esc(x.DESTINO)+'<small>'+esc(x.PROYECTO)+'</small></td><td data-label="Estado"><span class="pill '+kind+'">'+esc(x.ESTADO)+'</span></td><td data-label="Acciones" class="right"><div class="actions">'+buttons+'</div></td></tr>'}).join('')}
+    function renderSummary(){let stock=availableStock(),ids=new Set(stock.map(x=>x.materialId)),zones=new Set(stock.map(x=>x.zone)),projects=new Set(stock.map(x=>x.project)),batches=new Set(pendingEvents().map(x=>x.ID_LOTE));
+      $('statReferences').textContent=ids.size;$('statZones').textContent=zones.size;$('statProjects').textContent=projects.size;$('statPending').textContent=batches.size;
+      $('navPending').textContent=batches.size?'· '+batches.size:'';$('transitNote').hidden=batches.size===0}
+    function available(){let p=$('mProject').value,z=$('mOrigin').value,items=availableStock().filter(x=>x.project===p&&x.zone===z);
+      setChoices('mMaterial',items.map(x=>({id:x.materialId,label:x.description+(x.reference?' · '+x.reference:'')+' — '+x.quantity+' '+x.unit})),'id','label','Selecciona un material');
+      $('materialHint').textContent=items.length?items.length+' referencias disponibles en esta ubicación.':'No hay material disponible en esta ubicación.';renderMoveSummary()}
+    function renderMoveSummary(){let material=availableStock().find(x=>x.project===$('mProject').value&&x.zone===$('mOrigin').value&&x.materialId===$('mMaterial').value);
+      let quantity=$('mQuantity').value,destination=$('mDestination').value,zone=state.zones.find(z=>z.CODIGO===destination);
+      $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(zone?.AREA==='CAMPA'?' · Pendiente de recepción en campa':''):'Selecciona primero un material para preparar el traslado.'}
+    function addLine(){let d=document.createElement('div');d.className='line';
+      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Recibida *</span><input class="quantity" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field"><span>Esperada</span><input class="expected" type="number" inputmode="decimal" step="0.001" min="0.001"></label><label class="field incident"><span>Incidencia de esta línea</span><input class="incident" maxlength="250" placeholder="Indica faltantes o daños si los hay"></label></div>';
+      $('receiptLines').append(d);numberLines()}
+    function numberLines(){document.querySelectorAll('#receiptLines .line-number').forEach((x,i)=>x.textContent=i+1)}
+    function removeLine(button){if(document.querySelectorAll('#receiptLines .line').length===1){status('Debe quedar al menos una línea de material.','error');return}button.closest('.line').remove();numberLines()}
+    function suggestMaterial(input){let ref=input.value.trim().toLocaleLowerCase('es'),material=state.materials?.find(m=>m.REFERENCIA&&m.REFERENCIA.toLocaleLowerCase('es')===ref);
+      if(!material)return;let line=input.closest('.line');line.querySelector('.description').value=material.DESCRIPCION;line.querySelector('.manufacturer').value=material.FABRICANTE||'';
+      let unit=line.querySelector('.unit');if([...unit.options].some(o=>o.value===material.UNIDAD))unit.value=material.UNIDAD}
+    function positive(value){let n=Number(value);return Number.isFinite(n)&&n>0&&Math.round(n*1000)===n*1000}
+    function value(line,cls){return line.querySelector('.'+cls).value.trim()}
+    function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
+      if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, almacén, proveedor y número de albarán o factura.');
+      if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
+      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','quantity','expected','incident'].map(k=>[k,value(line,k)]));
+        if(!item.description||!positive(item.quantity)||item.expected&&!positive(item.expected))throw Error('Revisa la descripción y las cantidades de la línea '+(i+1)+'.');return item});
+      return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
+    function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
+      let material=availableStock().find(x=>x.project===project&&x.zone===origin&&x.materialId===id);
+      if(!project||!origin||!destination||origin===destination)throw Error('Elige un proyecto y dos ubicaciones distintas.');
+      if(!material)throw Error('Selecciona un material disponible en el origen.');
+      if(!positive(quantity)||Number(quantity)>material.quantity+1e-8)throw Error('Introduce una cantidad válida, sin superar '+material.quantity+' '+material.unit+' disponibles.');
+      return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
+    async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
+      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;
+        setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones,'CODIGO','NOMBRE','Todas');
+        renderSummary();renderStock();renderMoves();available();if(manual)status('Datos actualizados.')}
+      catch(e){if(manual)fail(e);else throw e}}
+    async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
+    async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
+      receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
+      try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
+        await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' línea(s).'),'stock')}
+      catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
+      finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
+    async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}
+      let x=availableStock().find(item=>item.project===p.project&&item.zone===p.origin&&item.materialId===p.lines[0].materialId);
+      if(!confirm('Mover '+p.lines[0].quantity+' '+x.unit+' de «'+x.description+'» desde '+p.origin+' hasta '+p.destination+'?'))return;
+      moveSaving=true;pendingMove=p.batchId;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Guardando…';status('Registrando movimiento…','info');
+      try{let result=await call('moveStock',p);pendingMove='';$('mQuantity').value='';$('mNote').value='';
+        await afterSave('Movimiento '+result.batchId.slice(0,8)+(result.duplicate?' ya registrado.':' registrado.'),'moves')}
+      catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de repetir el traslado.','error')}
+      finally{moveSaving=false;$('moveSubmit').disabled=false;$('moveSubmit').textContent='Registrar movimiento'}}
+    async function confirmMove(batchId){if(actionBusy)return;if(!confirm('Confirmar que el material del lote '+batchId.slice(0,8)+' ya se recibió en campa?'))return;
+      actionBusy=true;status('Confirmando recepción en campa…','info');
+      try{await call('confirmCamp',{batchId});await afterSave('Lote '+batchId.slice(0,8)+' confirmado en campa.','moves')}catch(e){fail(e)}finally{actionBusy=false}}
+    async function cancelMovement(batchId){if(actionBusy||state.user.role!=='ADMIN')return;if(!confirm('Anular el movimiento '+batchId.slice(0,8)+'? El material volverá a figurar en el origen.'))return;
+      actionBusy=true;status('Anulando movimiento…','info');
+      try{await call('cancelMove',{batchId});await afterSave('Movimiento '+batchId.slice(0,8)+' anulado.','moves')}catch(e){fail(e)}finally{actionBusy=false}}
+    function exportStock(){let rows=filteredStock();if(!rows.length){status('No hay existencias visibles para exportar.','error');return}
+      let quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"',header=['Material','Referencia','Proyecto','Zona','Disponible','Unidad'];
+      let csv='\uFEFF'+[header,...rows.map(x=>[x.description,x.reference,x.project,x.zone,x.quantity,x.unit])].map(row=>row.map(quote).join(';')).join('\r\n');
+      let url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='existencias-almacen-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+    async function signedIn(result){credential=result.credential;$('loginError').hidden=true;
+      try{state=await call('bootstrap');$('login').hidden=true;$('app').hidden=false;$('identity').hidden=false;
+        $('userName').textContent=state.user.name;$('userRole').textContent=state.user.role;
+        document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
+        setChoices('rProject',state.projects,'CODIGO','CODIGO');setChoices('mProject',state.projects,'CODIGO','CODIGO');
+        setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
+        setChoices('mOrigin',state.zones,'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
+        addLine();await refresh();view('stock',false)}
+      catch(e){$('app').hidden=true;$('login').hidden=false;$('identity').hidden=true;$('loginError').textContent=e.message;$('loginError').hidden=false}}
+    function initGoogle(){google.accounts.id.initialize({client_id:CLIENT_ID,callback:signedIn,ux_mode:'popup'});google.accounts.id.renderButton($('signin'),{theme:'outline',size:'large',text:'signin_with',width:250})}
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
+</body>
+</html>
