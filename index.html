@@ -112,6 +112,9 @@
     #warehousePlan text{pointer-events:none}
     .zone-shape{fill:#18a5a744;stroke:#067d83;stroke-width:2.5;cursor:pointer;transition:fill .15s}
     .zone-shape:hover,.zone-shape.selected{fill:#12a3a777;stroke:#074e59;stroke-width:4}
+    .dimension-label{font-size:13px;font-weight:800;fill:#163a50;stroke:#fff;stroke-width:5px;paint-order:stroke;pointer-events:none}
+    .dimension-preview{stroke:#a96a10;stroke-width:2;stroke-dasharray:6 5;pointer-events:none}
+    #mapDimensions,#mapMeasure{pointer-events:none}
     .draft-shape{fill:#eab84d55;stroke:#a96a10;stroke-width:3;stroke-dasharray:8 5;pointer-events:none}
     .zone-editor{margin-top:18px;padding:18px;background:#f7faf9;border:1px solid #d7e6e4;border-radius:12px}
     .zone-editor .form-grid{margin:15px 0}
@@ -167,18 +170,18 @@
     <section id="map" hidden>
       <div class="card panel"><div class="panel-top"><div><h2>Nave 9 · planta baja</h2><p>Contorno obtenido del DWG entregado. Superficie de la nave según el plano: 431,28 m².</p></div></div>
         <div class="map-grid">
-          <div><div class="floor-wrap"><svg id="warehousePlan" viewBox="0 0 680 680" onclick="mapCanvasClick(event)" role="img" aria-labelledby="floorTitle floorDesc">
+          <div><div class="floor-wrap"><svg id="warehousePlan" viewBox="0 0 680 680" onclick="mapCanvasClick(event)" onpointermove="mapCanvasMove(event)" onpointerleave="clearMapMeasure()" role="img" aria-labelledby="floorTitle floorDesc">
             <title id="floorTitle">Contorno de la nave 9 en planta baja</title><desc id="floorDesc">Nave de planta aproximadamente rectangular con esquina inferior izquierda achaflanada. El dibujo original no señala zonas de almacenamiento dentro de la nave.</desc>
             <defs><pattern id="floorGrid" width="25" height="25" patternUnits="userSpaceOnUse"><path d="M 25 0 L 0 0 0 25" fill="none" stroke="#e5ebed" stroke-width="1"/></pattern></defs>
             <path d="M65 70 H575 V590 H235 L65 420 Z" fill="#eaf2f4" stroke="#163a50" stroke-width="5" stroke-linejoin="round"/>
             <path d="M65 70 H575 V590 H235 L65 420 Z" fill="url(#floorGrid)"/>
-            <g id="mapPolygons"></g><g id="mapDraft"></g>
+            <g id="mapPolygons"></g><g id="mapDimensions"></g><g id="mapDraft"></g><g id="mapMeasure"></g>
             <text x="320" y="265" text-anchor="middle" fill="#183e54" font-size="32" font-weight="750">NAVE 9</text>
             <text x="320" y="305" text-anchor="middle" fill="#486a7a" font-size="18">431,28 m² · planta baja</text>
             <text x="320" y="343" text-anchor="middle" fill="#557b85" font-size="14">Zonas interiores pendientes de señalar</text>
             <path d="M65 47 H575" stroke="#859eaa" stroke-width="1"/><text x="320" y="39" text-anchor="middle" fill="#617986" font-size="14">20,87 m en el plano</text>
             <path d="M600 70 V590" stroke="#859eaa" stroke-width="1"/><text x="626" y="335" transform="rotate(90 626 335)" text-anchor="middle" fill="#617986" font-size="14">21,31 m en el plano</text>
-          </svg></div><p class="intro">El contorno y la superficie proceden del DWG. Las líneas interiores, accesos libres y superficies útiles de almacenamiento se definirán sobre la realidad de la nave.</p></div>
+          </svg></div><p class="intro">Cotas de zona aproximadas, calculadas a partir de las cotas generales del DWG. Verifica cada tramo en la nave antes de pintar o dimensionar zonas. La superficie útil se introduce tras medirla.</p></div>
           <div><h3>Ubicaciones registradas</h3><p class="intro">Elige una ubicación para consultar lo que figura en ella. Pulsa una zona dibujada o una ubicación de la lista para consultar su material.</p>
             <div id="mapZones" class="zone-list"></div><div id="mapDetail" class="map-detail" aria-live="polite">Selecciona una ubicación de almacén.</div>
             <div id="mapSetupHint" class="notice warning" hidden>Para delimitar zonas desde aquí, actualiza primero el código de Apps Script y su implementación web.</div>
@@ -186,13 +189,13 @@
         </div>
         <div id="zoneEditor" class="zone-editor" hidden>
           <div class="panel-top"><div><h3>Delimitar una zona en el suelo</h3><p>Solo ADMIN. Marca los vértices sobre el plano; la posición se comparte con todos. Reserva accesos y pasillos libres.</p></div></div>
-          <label class="field"><span>Ubicación existente o nueva</span><select id="zonePick" onchange="loadZoneEditor()"><option value="">Nueva zona</option></select></label>
+          <label class="field"><span>Ubicación existente o nueva</span><select id="zonePick" onchange="changeZoneSelection()"><option value="">Nueva zona</option></select><small>Guarda cada zona antes de elegir «Nueva zona». Las zonas guardadas permanecen visibles en verde.</small></label>
           <div class="form-grid three">
-            <label class="field"><span>Código *</span><input id="zoneCode" maxlength="20" placeholder="N9-01"></label>
-            <label class="field"><span>Nombre *</span><input id="zoneName" maxlength="80" placeholder="Tubería y accesorios"></label>
-            <label class="field"><span>Categoría prevista *</span><input id="zoneCategory" maxlength="80" placeholder="Conductos, tubería, pequeño material…"></label>
+            <label class="field"><span>Código *</span><input id="zoneCode" oninput="markZoneDirty()" maxlength="20" placeholder="N9-01"></label>
+            <label class="field"><span>Nombre *</span><input id="zoneName" oninput="markZoneDirty()" maxlength="80" placeholder="Tubería y accesorios"></label>
+            <label class="field"><span>Categoría prevista *</span><input id="zoneCategory" oninput="markZoneDirty()" maxlength="80" placeholder="Conductos, tubería, pequeño material…"></label>
           </div>
-          <label class="field" style="max-width:280px"><span>Superficie útil medida en m²</span><input id="zoneArea" type="number" inputmode="decimal" min="0.01" max="431.28" step="0.01" placeholder="Dejar en blanco si no está medida"><small>La superficie de la nave no equivale a la superficie útil de cada zona.</small></label>
+          <label class="field" style="max-width:280px"><span>Superficie útil medida en m²</span><input id="zoneArea" oninput="markZoneDirty()" type="number" inputmode="decimal" min="0.01" max="431.28" step="0.01" placeholder="Dejar en blanco si no está medida"><small>La superficie de la nave no equivale a la superficie útil de cada zona.</small></label>
           <div id="draftCount" class="summary">Selecciona una zona y pulsa «Dibujar zona» para marcar los vértices.</div>
           <div class="tools spacer"><button class="button secondary" type="button" onclick="beginMapDrawing()">Dibujar zona</button><button class="button ghost" type="button" onclick="undoMapPoint()">Deshacer punto</button><button id="zoneSave" class="button" type="button" onclick="saveMapZone()">Guardar zona</button></div>
         </div>
@@ -248,7 +251,7 @@
   <script>
     const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
     const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
-    let credential='',state={},pendingReceipt='',pendingMove='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[];
+    let credential='',state={},pendingReceipt='',pendingMove='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='';
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     function status(message,type='success'){let el=$('status');el.textContent=message;el.className='flash '+type;el.hidden=!message}
@@ -280,16 +283,35 @@
     function renderStock(){let rows=filteredStock();lastVisibleStock=rows;$('stockCount').textContent=rows.length+' posiciones visibles';$('stockEmpty').hidden=rows.length>0;
       $('stockRows').innerHTML=rows.map(x=>'<tr><td data-label="Material"><strong>'+esc(x.description)+'</strong></td><td data-label="Referencia">'+esc(x.reference||'—')+'</td><td data-label="Proyecto">'+esc(x.project)+'</td><td data-label="Ubicación">'+esc(x.zone)+'</td><td data-label="Disponible" class="right"><span class="qty">'+esc(x.quantity)+' '+esc(x.unit)+'</span></td></tr>').join('')}
     const SVG_NS='http://www.w3.org/2000/svg';
+    const METRES_X=20.87/510,METRES_Y=21.31/520;
+    function segmentMetres(a,b){return Math.hypot((b[0]-a[0])*METRES_X,(b[1]-a[1])*METRES_Y)}
+    function metresText(a,b){return '≈ '+segmentMetres(a,b).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' m'}
+    function segmentLabel(group,a,b){let label=document.createElementNS(SVG_NS,'text');
+      let x=(a[0]+b[0])/2,y=(a[1]+b[1])/2;
+      label.setAttribute('x',x);label.setAttribute('y',y-8);label.setAttribute('text-anchor','middle');label.setAttribute('class','dimension-label');
+      if(Math.abs(a[0]-b[0])<Math.abs(a[1]-b[1])*.35)label.setAttribute('transform','rotate(-90 '+x+' '+(y-8)+')');
+      label.textContent=metresText(a,b);group.append(label)}
+    function zoneDimensions(){let group=$('mapDimensions');group.replaceChildren();let code=$('mapDetail').dataset.zone,zone=mapConfig(code);
+      if(!zone||drawing&&editorZoneCode===code)return;
+      zone.points.forEach((point,i)=>segmentLabel(group,point,zone.points[(i+1)%zone.points.length]))}
+    function svgPoint(event){let svg=$('warehousePlan'),point=svg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;
+      let p=point.matrixTransform(svg.getScreenCTM().inverse());return[Math.round(p.x*10)/10,Math.round(p.y*10)/10]}
+    function clearMapMeasure(){$('mapMeasure').replaceChildren()}
+    function mapCanvasMove(event){clearMapMeasure();if(!drawing||!draftPoints.length)return;
+      let end=svgPoint(event);if(!pointInFloor(...end))return;
+      let group=$('mapMeasure'),start=draftPoints[draftPoints.length-1],line=document.createElementNS(SVG_NS,'line');
+      for(const[name,value]of Object.entries({x1:start[0],y1:start[1],x2:end[0],y2:end[1]}))line.setAttribute(name,value);
+      line.setAttribute('class','dimension-preview');group.append(line);segmentLabel(group,start,end)}
     function mapConfig(code){return(state.zoneMap||[]).find(z=>z.code===code)}
     function drawZoneShapes(){let parent=$('mapPolygons');parent.replaceChildren();
-      for(const z of state.zoneMap||[]){if(!Array.isArray(z.points)||z.points.length<3)continue;
+      for(const z of state.zoneMap||[]){if(!Array.isArray(z.points)||z.points.length<3||drawing&&editorZoneCode===z.code)continue;
         let poly=document.createElementNS(SVG_NS,'polygon');poly.setAttribute('points',z.points.map(p=>p.join(',')).join(' '));
         poly.setAttribute('class','zone-shape'+($('mapDetail').dataset.zone===z.code?' selected':''));
         poly.setAttribute('aria-label','Zona '+z.code+' · '+z.category);poly.setAttribute('role','button');poly.setAttribute('tabindex','0');
         poly.addEventListener('click',e=>{e.stopPropagation();if(drawing)mapCanvasClick(e);else selectMapZone(z.code)});
         poly.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectMapZone(z.code)}});
         let title=document.createElementNS(SVG_NS,'title');title.textContent=z.code+' · '+z.category;poly.append(title);parent.append(poly);
-      }
+      }zoneDimensions();
     }
     function renderMap(){let zones=(state.zones||[]).filter(z=>z.AREA==='ALMACEN');
       $('mapZones').innerHTML=zones.map(z=>{let n=availableStock().filter(x=>x.zone===z.CODIGO).length,conf=mapConfig(z.CODIGO);
@@ -303,33 +325,51 @@
     function selectMapZone(code){let zone=(state.zones||[]).find(z=>z.CODIGO===code&&z.AREA==='ALMACEN');if(!zone)return;
       $('mapDetail').dataset.zone=code;document.querySelectorAll('.zone-item').forEach(b=>b.classList.toggle('selected',b.dataset.zone===code));
       drawZoneShapes();let items=availableStock().filter(x=>x.zone===code),conf=mapConfig(code);
-      $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+' · '+(conf?'en plano · categoría: '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':' · superficie útil pendiente'):'posición exacta pendiente')+'</small>'+(items.length?'<ul>'+items.map(x=>'<li><strong>'+esc(x.description)+'</strong> · '+esc(x.quantity)+' '+esc(x.unit)+'<small>'+esc(x.project)+(x.reference?' · '+esc(x.reference):'')+'</small></li>').join('')+'</ul>':'<p class="muted">Sin existencias en esta ubicación.</p>')}
-    function toggleZoneEditor(){$('zoneEditor').hidden=!$('zoneEditor').hidden;if(!$('zoneEditor').hidden)loadZoneEditor();else{drawing=false;$('warehousePlan').classList.remove('editor')}}
+      let lengths=conf?.points?.map((p,i)=>metresText(p,conf.points[(i+1)%conf.points.length])).join(' · ');
+      $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+' · '+(conf?'en plano · categoría: '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':' · superficie útil pendiente'):'posición exacta pendiente')+'</small>'+(lengths?'<small>Lados aproximados: '+esc(lengths)+'</small>':'')+(items.length?'<ul>'+items.map(x=>'<li><strong>'+esc(x.description)+'</strong> · '+esc(x.quantity)+' '+esc(x.unit)+'<small>'+esc(x.project)+(x.reference?' · '+esc(x.reference):'')+'</small></li>').join('')+'</ul>':'<p class="muted">Sin existencias en esta ubicación.</p>')}
+    function nextZoneCode(){let used=new Set((state.zones||[]).map(z=>z.CODIGO));let n=1;
+      while(used.has('N9-'+String(n).padStart(2,'0')))n++;return 'N9-'+String(n).padStart(2,'0')}
+    function markZoneDirty(){draftDirty=true;renderDraft()}
+    function changeZoneSelection(){if(draftDirty&&!confirm('Esta zona tiene cambios sin guardar. ¿Descartarlos para cambiar de zona?')){
+        $('zonePick').value=editorZoneCode;return}loadZoneEditor()}
+    function toggleZoneEditor(){let editor=$('zoneEditor');if(!editor.hidden&&draftDirty&&!confirm('Esta zona tiene cambios sin guardar. ¿Cerrar y descartarlos?'))return;
+      editor.hidden=!editor.hidden;
+      if(!editor.hidden)loadZoneEditor();else{drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();$('mapDraft').replaceChildren();drawZoneShapes()}}
     function loadZoneEditor(){let code=$('zonePick').value,z=(state.zones||[]).find(x=>x.CODIGO===code),conf=mapConfig(code);
-      $('zoneCode').value=code;$('zoneCode').readOnly=!!code;$('zoneName').value=z?.NOMBRE||'';
+      editorZoneCode=code;$('zoneCode').value=code||nextZoneCode();$('zoneCode').readOnly=!!code;$('zoneName').value=z?.NOMBRE||'';
       $('zoneCategory').value=conf?.category||'';$('zoneArea').value=conf?.area||'';
-      draftPoints=conf?.points?.map(p=>[...p])||[];drawing=false;$('warehousePlan').classList.remove('editor');renderDraft()}
+      draftPoints=conf?.points?.map(p=>[...p])||[];drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
+      if(code)selectMapZone(code);else{delete $('mapDetail').dataset.zone;$('mapDetail').textContent='Nueva zona '+$('zoneCode').value+': dibuja su perímetro y pulsa «Guardar zona». Las zonas verdes ya guardadas siguen en el plano.';
+        document.querySelectorAll('.zone-item').forEach(b=>b.classList.remove('selected'));drawZoneShapes()}
+      renderDraft()}
     function renderDraft(){let group=$('mapDraft');group.replaceChildren();
-      if(draftPoints.length){let p=document.createElementNS(SVG_NS,draftPoints.length>=3?'polygon':'polyline');
+      if((drawing||geometryDirty)&&draftPoints.length){let p=document.createElementNS(SVG_NS,draftPoints.length>=3?'polygon':'polyline');
         p.setAttribute('points',draftPoints.map(x=>x.join(',')).join(' '));p.setAttribute('class','draft-shape');group.append(p);
-        draftPoints.forEach(point=>{let dot=document.createElementNS(SVG_NS,'circle');dot.setAttribute('cx',point[0]);dot.setAttribute('cy',point[1]);dot.setAttribute('r','5');dot.setAttribute('fill','#a96a10');dot.setAttribute('pointer-events','none');group.append(dot)})}
-      $('draftCount').textContent=drawing?'Marca los vértices en el plano. Puntos: '+draftPoints.length+' (mínimo 3).':'Vértices marcados: '+draftPoints.length+'. Puedes redibujar la zona.'}
-    function beginMapDrawing(){if($('zoneEditor').hidden)return;draftPoints=[];drawing=true;$('warehousePlan').classList.add('editor');renderDraft()}
-    function undoMapPoint(){if(!draftPoints.length)return;draftPoints.pop();renderDraft()}
+        draftPoints.forEach(point=>{let dot=document.createElementNS(SVG_NS,'circle');dot.setAttribute('cx',point[0]);dot.setAttribute('cy',point[1]);dot.setAttribute('r','5');dot.setAttribute('fill','#a96a10');dot.setAttribute('pointer-events','none');group.append(dot)});
+        for(let i=1;i<draftPoints.length;i++)segmentLabel(group,draftPoints[i-1],draftPoints[i]);
+        if(draftPoints.length>=3)segmentLabel(group,draftPoints[draftPoints.length-1],draftPoints[0])}
+      let name=$('zoneCode').value||'esta zona';$('draftCount').textContent=drawing?
+        'Dibujando '+name+' · '+draftPoints.length+' puntos. La línea al cursor y cada lado muestran metros aproximados. Guarda la zona antes de iniciar otra.':
+        draftDirty?'Zona '+name+' sin guardar · '+draftPoints.length+' puntos. Pulsa «Guardar zona» para fijarla por separado.':
+        draftPoints.length?'Zona '+name+' guardada. Sus lados aparecen al seleccionarla en el plano. Pulsa «Dibujar zona» para cambiar el perímetro.':
+        'Zona nueva '+name+'. Pulsa «Dibujar zona», marca al menos tres puntos y guarda antes de crear la siguiente.'}
+    function beginMapDrawing(){if($('zoneEditor').hidden)return;
+      if(draftDirty&&draftPoints.length&&!confirm('¿Descartar el dibujo sin guardar y empezar de nuevo?'))return;
+      draftPoints=[];draftDirty=true;geometryDirty=true;drawing=true;$('warehousePlan').classList.add('editor');clearMapMeasure();drawZoneShapes();renderDraft()}
+    function undoMapPoint(){if(!draftPoints.length)return;draftPoints.pop();draftDirty=true;geometryDirty=true;clearMapMeasure();renderDraft()}
     function pointInFloor(x,y){let polygon=[[65,70],[575,70],[575,590],[235,590],[65,420]],direction=0;
       for(let i=0;i<polygon.length;i++){let a=polygon[i],b=polygon[(i+1)%polygon.length],cross=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);
         if(Math.abs(cross)<.01)continue;if(direction&&Math.sign(cross)!==direction)return false;direction=Math.sign(cross)}return true}
-    function mapCanvasClick(e){if(!drawing)return;let svg=$('warehousePlan'),pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
-      let p=pt.matrixTransform(svg.getScreenCTM().inverse()),x=Math.round(p.x*10)/10,y=Math.round(p.y*10)/10;
+    function mapCanvasClick(e){if(!drawing)return;let [x,y]=svgPoint(e);
       if(!pointInFloor(x,y)){status('Marca los puntos dentro del contorno de la nave.','error');return}
       if(draftPoints.length>=20){status('Máximo 20 vértices por zona.','error');return}
-      draftPoints.push([x,y]);renderDraft()}
+      draftPoints.push([x,y]);draftDirty=true;geometryDirty=true;clearMapMeasure();renderDraft()}
     async function saveMapZone(){if(state.user?.role!=='ADMIN'||!state.zoneMapSupported)return;
       let code=$('zoneCode').value.trim().toUpperCase(),name=$('zoneName').value.trim(),category=$('zoneCategory').value.trim(),area=$('zoneArea').value.trim();
       if(!/^[A-Z0-9-]{2,20}$/.test(code)||!name||!category||draftPoints.length<3){status('Completa código, nombre, categoría y al menos tres puntos.','error');return}
       if(!confirm('Guardar la delimitación de '+code+' para todos los usuarios?'))return;
       $('zoneSave').disabled=true;status('Guardando la zona…','info');
-      try{let r=await call('saveZoneMap',{code,name,category,area,points:draftPoints});drawing=false;$('warehousePlan').classList.remove('editor');
+      try{let r=await call('saveZoneMap',{code,name,category,area,points:draftPoints});drawing=false;draftDirty=false;geometryDirty=false;$('warehousePlan').classList.remove('editor');clearMapMeasure();
         let result=await call('bootstrap');state.zones=result.zones;state.zoneMap=result.zoneMap;state.zoneMapSupported=true;
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
         setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
@@ -419,6 +459,4 @@
   </script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
 </body>
-</html>
-
 </html>
