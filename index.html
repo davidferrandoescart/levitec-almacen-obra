@@ -7,7 +7,7 @@
 <section id="transfer" hidden><h2>Mover material</h2><div class="grid"><div><label>Proyecto</label><select id="mProject" onchange="available()"></select></div><div><label>Origen</label><select id="mOrigin" onchange="available()"></select></div><div><label>Destino</label><select id="mDestination"></select></div></div><label>Material disponible</label><select id="mMaterial"></select><label>Cantidad</label><input id="mQuantity" type="number" min="0.001" step="0.001"><label>Motivo</label><input id="mNote"><p><button onclick="saveMove()">Registrar movimiento</button></p></section></div></main>
 <script>
 // Configurar estos dos valores antes de publicar. El origen autorizado se define en Apps Script.
-const CLIENT_ID='879636449979-tl4u210nduk4vbqdfj5hl151483m9qja.apps.googleusercontent.com';
+CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
 const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
 const SCRIPT_ORIGIN='https://script.google.com';
 let credential='',state={},pendingReceipt='',pendingMove='';
