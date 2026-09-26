@@ -150,6 +150,7 @@
       <button class="tab" type="button" data-view="map" onclick="view('map')">Layout</button>
       <button class="tab" type="button" data-view="quality" onclick="view('quality')">Cuarentena <span id="navQuarantine"></span></button>
       <button class="tab" type="button" data-view="notifications" onclick="view('notifications')">Notificaciones <span id="navNotifications"></span></button>
+      <button class="tab" type="button" data-view="transfers" onclick="view('transfers')">Traspasos <span id="navTransfers"></span></button>
       <button class="tab" type="button" data-view="moves" onclick="view('moves')">Movimientos <span id="navPending"></span></button>
       <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
       <button class="tab write" type="button" data-view="transfer" onclick="view('transfer')">Mover material</button>
@@ -222,6 +223,15 @@
         <div id="notificationEmpty" class="empty" hidden><b>Sin notificaciones pendientes</b>No hay entregas pendientes de validar.</div>
       </div>
     </section>
+
+    <section id="transfers" hidden>
+      <div class="card panel">
+        <div class="panel-top"><div><h2>Traspasos entre proyectos</h2><p>Cuando una obra consume material originalmente imputado a otra, el sistema registra automáticamente el préstamo interno sin separar físicamente el stock.</p></div></div>
+        <div id="transferBalance" class="summary"></div>
+        <div class="table-wrap spacer"><table><thead><tr><th>Fecha</th><th>Material</th><th>De</th><th>A</th><th>Zona</th><th class="right">Cantidad</th><th>Estado</th><th class="right">Acción</th></tr></thead><tbody id="projectTransferRows"></tbody></table></div>
+        <div id="projectTransferEmpty" class="empty" hidden><b>Sin traspasos entre proyectos</b>Cuando un proyecto consuma stock imputado a otro, aparecerá aquí automáticamente.</div>
+      </div>
+    </section>
     <section id="moves" hidden>
       <div class="card panel">
         <div class="panel-top"><div><h2>Historial de movimientos</h2><p>Los traslados a obra o campa quedan pendientes hasta que se valida su recepción física.</p></div></div>
@@ -237,10 +247,11 @@
     <section id="receipt" class="card panel" hidden>
       <div class="panel-top"><div><h2>Registrar recepción</h2><p>Trabaja contra el albarán que recibe el almacén. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
       <div class="form-grid">
-        <label class="field"><span>Proyecto *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select></label>
+        <label class="field"><span>Proyecto de imputación *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select><small id="rProjectHint">Proyecto al que pertenece contablemente el material.</small></label>
         <label class="field"><span>Zona conforme por defecto *</span><select id="rZone" onchange="updateReceiptSuggestions()"></select><small>Solo para material conforme. La cuarentena se elige por línea cuando sea necesaria.</small></label>
         <label class="field"><span>Proveedor *</span><input id="supplier" autocomplete="organization" placeholder="Empresa proveedora" onchange="updateReceiptSuggestions()"></label>
         <label class="field"><span>Albarán o factura *</span><input id="document" placeholder="Número de documento"></label>
+        <label class="field"><span>Código obra / pedido del albarán</span><input id="imputationCode" placeholder="Ej. 260103" oninput="applyProjectRule()"><small id="imputationHint">Si existe una regla configurada, seleccionará automáticamente el proyecto.</small></label>
       </div>
       <div class="form-grid two spacer">
         <label class="field"><span>Enlace al documento</span><input id="documentUrl" type="url" placeholder="https://…"></label>
@@ -256,9 +267,9 @@
     <section id="transfer" class="card panel" hidden>
       <div class="panel-top"><div><h2>Mover material</h2><p>Selecciona la ubicación de origen para ver su material disponible.</p></div></div>
       <div class="form-grid three">
-        <label class="field"><span>Proyecto *</span><select id="mProject" onchange="available()"></select></label>
+        <label class="field"><span>Edificio / proyecto de consumo *</span><select id="mProject" onchange="available()"></select><small>Para salidas a obra, indica dónde se consume el material.</small></label>
         <label class="field"><span>Origen *</span><select id="mOrigin" onchange="available()"></select></label>
-        <label class="field"><span>Destino *</span><select id="mDestination" onchange="renderMoveSummary()"></select></label>
+        <label class="field"><span>Destino *</span><select id="mDestination" onchange="destinationChanged()"></select></label>
       </div>
       <div class="form-grid two spacer">
         <label class="field"><span>Material disponible *</span><select id="mMaterial" onchange="renderMoveSummary()"></select><small id="materialHint"></small></label>
@@ -293,12 +304,18 @@
     })}
     function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
       items.forEach(item=>el.add(new Option(item[label]||item[key],item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
-    const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Entregas a obra o campa pendientes de validación.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
+    const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Entregas a obra o campa pendientes de validación.'],transfers:['Traspasos','Consumos cruzados y saldos pendientes de compensar entre proyectos.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
     function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
-      $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(['moves','notifications'].includes(id)&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
+      $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(['moves','notifications','transfers'].includes(id)&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
     const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     function destinationNeedsValidation(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return false;let tag=normalize([z.CODIGO,z.NOMBRE].join(' '));return ['CAMPA','OBRA'].includes(z.AREA)||tag.includes('zaz081')||tag.includes('zaz091')}
+    function projectForDestination(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return '';let tag=normalize([z.CODIGO,z.NOMBRE].join(' '));if(tag.includes('081')||tag.includes('zaz81'))return 'ZAZ081';if(tag.includes('091')||tag.includes('zaz91'))return 'ZAZ091';return ''}
+    function destinationChanged(){let project=projectForDestination($('mDestination').value);if(project&&[...$('mProject').options].some(o=>o.value===project))$('mProject').value=project;available();renderMoveSummary()}
+    function applyProjectRule(){let code=$('imputationCode').value.trim(),rule=(state.projectRules||[]).find(r=>String(r.CODIGO).trim().toLowerCase()===code.toLowerCase());
+      if(rule&&[...$('rProject').options].some(o=>o.value===rule.PROYECTO)){$('rProject').value=rule.PROYECTO;$('imputationHint').textContent='Asignación automática: '+code+' → '+rule.PROYECTO;updateReceiptSuggestions()}
+      else $('imputationHint').textContent=code?'Código sin regla activa. Selecciona el proyecto manualmente.':'Si existe una regla configurada, seleccionará automáticamente el proyecto.'}
+    function physicalMaterials(origin){let groups=new Map();availableStock().filter(x=>x.zone===origin).forEach(x=>{let g=groups.get(x.materialId)||{materialId:x.materialId,description:x.description,reference:x.reference,unit:x.unit,quantity:0,projects:{}};g.quantity+=Number(x.quantity);g.projects[x.project]=(g.projects[x.project]||0)+Number(x.quantity);groups.set(x.materialId,g)});return [...groups.values()].map(g=>({...g,quantity:Math.round(g.quantity*1000)/1000}))}
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&destinationNeedsValidation(x.DESTINO))}
     function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
     function quarantineStock(){return(state.stock||[]).filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0)}
@@ -366,15 +383,18 @@
       if(previous&&zones.some(z=>z.CODIGO===previous))selectMapZone(previous);else $('mapDetail').textContent='Selecciona una ubicación de almacén.'}
     function selectMapZone(code){let zone=(state.zones||[]).find(z=>z.CODIGO===code&&['ALMACEN','CUARENTENA'].includes(z.AREA));if(!zone)return;
       $('mapDetail').dataset.zone=code;document.querySelectorAll('.zone-item').forEach(b=>b.classList.toggle('selected',b.dataset.zone===code));
-      drawZoneShapes();let items=(state.stock||[]).filter(x=>x.zone===code&&Number(x.quantity)>0),conf=mapConfig(code);
+      drawZoneShapes();let raw=(state.stock||[]).filter(x=>x.zone===code&&Number(x.quantity)>0),conf=mapConfig(code);
       let lengths=conf?.points?.map((p,i)=>metresText(p,conf.points[(i+1)%conf.points.length])).join(' · ');
       let canMove=zone.AREA==='ALMACEN'&&['ADMIN','ALMACEN'].includes(state.user?.role);
-      let materialHtml=items.length?'<div class="zone-materials">'+items.map(x=>'<button type="button" class="zone-material" '+(canMove?'onclick="prepareMoveFromLayout(\''+esc(x.project)+'\',\''+esc(x.zone)+'\',\''+esc(x.materialId)+'\')"':'disabled')+'><span class="zone-material-ref">'+esc(x.reference||'Sin referencia')+'</span><strong>'+esc(x.description)+'</strong><span class="zone-material-meta">'+esc(x.quantity)+' '+esc(x.unit)+' · '+esc(x.project)+'</span>'+(canMove?'<span class="zone-material-action">Mover material →</span>':'')+'</button>').join('')+'</div>':'<p class="muted">Sin existencias en esta ubicación.</p>';
+      let groups=new Map();raw.forEach(x=>{let g=groups.get(x.materialId)||{materialId:x.materialId,reference:x.reference,description:x.description,unit:x.unit,quantity:0,projects:{}};g.quantity+=Number(x.quantity);g.projects[x.project]=(g.projects[x.project]||0)+Number(x.quantity);groups.set(x.materialId,g)});
+      let items=[...groups.values()];
+      let materialHtml=items.length?'<div class="zone-materials">'+items.map(x=>{let split=Object.entries(x.projects).map(([p,q])=>p+' '+(Math.round(q*1000)/1000)+' '+x.unit).join(' · ');
+        return '<button type="button" class="zone-material" '+(canMove?'onclick="prepareMoveFromLayout(\''+esc(code)+'\',\''+esc(x.materialId)+'\')"':'disabled')+'><span class="zone-material-ref">'+esc(x.reference||'Sin referencia')+'</span><strong>'+esc(x.description)+'</strong><span class="zone-material-meta">'+esc(Math.round(x.quantity*1000)/1000)+' '+esc(x.unit)+' disponibles'+(split?' · '+esc(split):'')+'</span>'+(canMove?'<span class="zone-material-action">Mover material →</span>':'')+'</button>'}).join('')+'</div>':'<p class="muted">Sin existencias en esta ubicación.</p>';
       $('mapDetail').innerHTML='<h3>'+esc(zone.NOMBRE||code)+'</h3><small>'+esc(code)+(zone.AREA==='CUARENTENA'?' · MATERIAL BLOQUEADO':'')+' · '+(conf?'en plano · categoría: '+esc(conf.category)+(conf.area?' · '+esc(conf.area)+' m² útiles medidos':' · superficie útil pendiente'):'posición exacta pendiente')+'</small>'+(lengths?'<small>Lados aproximados: '+esc(lengths)+'</small>':'')+materialHtml}
-    function prepareMoveFromLayout(project,origin,materialId){if(!['ADMIN','ALMACEN'].includes(state.user?.role))return;
-      view('transfer',false);$('mProject').value=project;$('mOrigin').value=origin;available();
+    function prepareMoveFromLayout(origin,materialId){if(!['ADMIN','ALMACEN'].includes(state.user?.role))return;
+      view('transfer',false);$('mOrigin').value=origin;available();
       if([...$('mMaterial').options].some(o=>o.value===materialId))$('mMaterial').value=materialId;renderMoveSummary();$('mQuantity').focus();
-      status('Movimiento preparado desde Layout. Indica cantidad y destino.','info')}
+      status('Movimiento preparado desde Layout. Indica edificio/proyecto, cantidad y destino.','info')}
     function nextZoneCode(){let used=new Set((state.zones||[]).map(z=>z.CODIGO));let n=1;
       while(used.has('N9-'+String(n).padStart(2,'0')))n++;return 'N9-'+String(n).padStart(2,'0')}
     function markZoneDirty(){draftDirty=true;renderDraft()}
@@ -424,6 +444,12 @@
         setChoices('mDestination',state.zones,'CODIGO','NOMBRE');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderMap();$('zonePick').value=r.code;loadZoneEditor();selectMapZone(r.code);status('Zona '+r.code+' guardada en el plano.')}
       catch(e){fail(e)}finally{$('zoneSave').disabled=false}}
+    function renderTransfers(){let rows=state.transfers||[],pending=rows.filter(x=>x.ESTADO==='PENDIENTE_COMPENSAR');$('navTransfers').textContent=pending.length?'· '+pending.length:'';
+      $('projectTransferEmpty').hidden=rows.length>0;
+      let balances=new Map();pending.forEach(x=>{let key=[x.PROYECTO_ORIGEN,x.PROYECTO_DESTINO,x.MATERIAL_ID].join('|'),g=balances.get(key)||{from:x.PROYECTO_ORIGEN,to:x.PROYECTO_DESTINO,description:x.DESCRIPCION,unit:x.UNIDAD,quantity:0};g.quantity+=Number(x.CANTIDAD||0);balances.set(key,g)});
+      $('transferBalance').innerHTML=balances.size?'<strong>Pendiente de compensar</strong><br>'+[...balances.values()].map(x=>esc(x.to)+' debe a '+esc(x.from)+': '+esc(Math.round(x.quantity*1000)/1000)+' '+esc(x.unit)+' · '+esc(x.description)).join('<br>'):'No hay saldos pendientes de compensar entre proyectos.';
+      $('projectTransferRows').innerHTML=rows.map(x=>'<tr><td data-label="Fecha">'+esc(String(x.FECHA||'').slice(0,16).replace('T',' '))+'</td><td data-label="Material"><strong>'+esc(x.DESCRIPCION)+'</strong><small>'+esc(x.MATERIAL_ID)+'</small></td><td data-label="De">'+esc(x.PROYECTO_ORIGEN)+'</td><td data-label="A">'+esc(x.PROYECTO_DESTINO)+'</td><td data-label="Zona">'+esc(x.ZONA)+'</td><td data-label="Cantidad" class="right"><span class="qty">'+esc(x.CANTIDAD)+' '+esc(x.UNIDAD)+'</span></td><td data-label="Estado"><span class="pill '+(x.ESTADO==='PENDIENTE_COMPENSAR'?'pending':'received')+'">'+esc(x.ESTADO)+'</span></td><td data-label="Acción" class="right">'+((['ADMIN','JEFE'].includes(state.user?.role)&&x.ESTADO==='PENDIENTE_COMPENSAR')?'<button type="button" class="button small secondary" data-id="'+esc(x.ID_TRASPASO)+'" onclick="compensateTransfer(this.dataset.id)">Marcar compensado</button>':'')+'</td></tr>').join('')}
+    async function compensateTransfer(id){if(actionBusy||!['ADMIN','JEFE'].includes(state.user?.role))return;if(!confirm('¿Marcar este traspaso como compensado?'))return;actionBusy=true;status('Actualizando traspaso…','info');try{await call('compensateProjectTransfer',{transferId:id});await afterSave('Traspaso marcado como compensado.','transfers')}catch(e){fail(e)}finally{actionBusy=false}}
     function renderMoves(){let q=normalize($('moveSearch').value),f=$('moveFilter').value,seen=new Set(),rows=(state.movements||[]).filter(x=>(!f||x.ESTADO===f)&&normalize([x.DESCRIPCION,x.ID_LOTE,x.PROYECTO,x.ORIGEN,x.DESTINO,x.DOCUMENTO_NUMERO,x.PROVEEDOR].join(' ')).includes(q));
       $('moveCount').textContent=rows.length+' movimientos visibles';$('moveEmpty').hidden=rows.length>0;
       $('moveRows').innerHTML=rows.map(x=>{let first=!seen.has(x.ID_LOTE),needsValidation=destinationNeedsValidation(x.DESTINO),buttons='';
@@ -441,12 +467,23 @@
     function renderSummary(){let stock=availableStock(),ids=new Set(stock.map(x=>x.materialId)),zones=new Set(stock.map(x=>x.zone)),projects=new Set(stock.map(x=>x.project)),batches=new Set(pendingEvents().map(x=>x.ID_LOTE));
       $('statReferences').textContent=ids.size;$('statZones').textContent=zones.size;$('statProjects').textContent=projects.size;$('statPending').textContent=batches.size;
       $('navPending').textContent=batches.size?'· '+batches.size:'';$('navNotifications').textContent=batches.size?'· '+batches.size:'';$('transitNote').hidden=batches.size===0;renderNotifications()}
-    function available(){let p=$('mProject').value,z=$('mOrigin').value,items=availableStock().filter(x=>x.project===p&&x.zone===z);
+    function available(){let origin=$('mOrigin').value,items=physicalMaterials(origin);
       setChoices('mMaterial',items.map(x=>({id:x.materialId,label:x.description+(x.reference?' · '+x.reference:'')+' — '+x.quantity+' '+x.unit})),'id','label','Selecciona un material');
-      $('materialHint').textContent=items.length?items.length+' referencias disponibles en esta ubicación.':'No hay material disponible en esta ubicación.';renderMoveSummary()}
-    function renderMoveSummary(){let material=availableStock().find(x=>x.project===$('mProject').value&&x.zone===$('mOrigin').value&&x.materialId===$('mMaterial').value);
-      let quantity=$('mQuantity').value,destination=$('mDestination').value,zone=state.zones.find(z=>z.CODIGO===destination);
-      $('moveSummary').textContent=material?'Disponible: '+material.quantity+' '+material.unit+' · '+(quantity||'—')+' '+material.unit+' de '+$('mOrigin').value+' a '+(destination||'—')+(destinationNeedsValidation(destination)?' · Quedará pendiente de validación en destino':zone?.AREA==='CUARENTENA'?' · Quedará bloqueado hasta liberación de Calidad':''):'Selecciona primero un material para preparar el traslado.'}
+      $('materialHint').textContent=items.length?items.length+' referencias físicas disponibles en esta ubicación.':'No hay material disponible en esta ubicación.';renderMoveSummary()}
+    function renderMoveSummary(){let origin=$('mOrigin').value,project=$('mProject').value,destination=$('mDestination').value,material=physicalMaterials(origin).find(x=>x.materialId===$('mMaterial').value);
+      let quantity=Number($('mQuantity').value||0),zone=state.zones.find(z=>z.CODIGO===destination);
+      if(!material){$('moveSummary').textContent='Selecciona una ubicación y un material para preparar el traslado.';return}
+      let own=Number(material.projects[project]||0),total=Number(material.quantity||0),borrow=Math.max(0,quantity-own),cross=destinationNeedsValidation(destination);
+      let text='Stock físico: '+total+' '+material.unit+' · imputado a '+(project||'—')+': '+own+' '+material.unit+'. ';
+      if(quantity>0){
+        if(quantity>total+1e-8)text+='Cantidad superior al stock físico disponible.';
+        else if(cross&&borrow>1e-8)text+='Se usarán '+(Math.round(borrow*1000)/1000)+' '+material.unit+' imputados a otro proyecto y se generará un traspaso pendiente de compensar.';
+        else if(!cross&&quantity>own+1e-8)text+='Para un movimiento interno no se puede usar stock imputado a otro proyecto.';
+        else text+='La salida puede registrarse sin traspaso entre proyectos.';
+      }
+      if(zone?.AREA==='CUARENTENA')text+=' El material quedará bloqueado en cuarentena.';
+      else if(destinationNeedsValidation(destination))text+=' Quedará pendiente de validación en destino.';
+      $('moveSummary').textContent=text}
     function addLine(){let d=document.createElement('div');d.className='line';
       d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Descripción *</span><input class="description" placeholder="Nombre del material" maxlength="200" onchange="updateReceiptSuggestions()"></label><label class="field"><span>Referencia</span><input class="reference" placeholder="Código de fabricante" maxlength="80" onchange="suggestMaterial(this)"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit" onchange="updateReceiptLine(this.closest(\'.line\'))"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Cantidad en albarán *</span><input class="albaranQty" type="number" inputmode="decimal" step="0.001" min="0.001" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>Recibida físicamente *</span><input class="receivedQty" type="number" inputmode="decimal" step="0.001" min="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>A cuarentena</span><input class="quarantineQty" type="number" inputmode="decimal" step="0.001" min="0" value="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field per-line-feature"><span>Ubicación conforme</span><select class="line-zone" onchange="updateReceiptLine(this.closest(\'.line\'))"><option value="">Zona conforme por defecto</option></select></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label></div><div class="quarantine-fields" hidden><label class="field"><span>Zona de cuarentena *</span><select class="quarantine-zone"></select></label><label class="field"><span>Motivo *</span><select class="quarantine-reason"><option value="">Selecciona motivo</option><option>Dañado / roto</option><option>Defecto aparente</option><option>Material incorrecto</option><option>Documentación pendiente</option><option>Pendiente inspección de Calidad</option><option>Otro</option></select></label><label class="field"><span>Detalle</span><input class="incident" maxlength="250" placeholder="Daño observado, falta documental, referencia incorrecta…"></label></div><div class="receipt-result">Introduce cantidades de albarán y recepción física.</div><p class="count zone-suggestion" aria-live="polite"></p>';
       d.querySelectorAll('.per-line-feature,.zone-suggestion').forEach(el=>el.hidden=!state.perLineZonesSupported);
@@ -489,33 +526,34 @@
         item.acceptedQty=String(Math.round((received-q)*1000)/1000);item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
         item.quarantineZone=line.querySelector('.quarantine-zone')?.value||'';item.quarantineReason=line.querySelector('.quarantine-reason')?.value||'';
         if(q>0&&(!item.quarantineZone||!item.quarantineReason))throw Error('Selecciona zona y motivo de cuarentena en la línea '+(i+1)+'.');return item});
-      return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
+      return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,imputationCode:$('imputationCode').value.trim(),zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
     function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
-      let material=availableStock().find(x=>x.project===project&&x.zone===origin&&x.materialId===id);
-      if(!project||!origin||!destination||origin===destination)throw Error('Elige un proyecto y dos ubicaciones distintas.');
+      let material=physicalMaterials(origin).find(x=>x.materialId===id);
+      if(!project||!origin||!destination||origin===destination)throw Error('Elige proyecto de consumo y dos ubicaciones distintas.');
       if(state.zones.some(z=>z.CODIGO===destination&&z.AREA==='CUARENTENA')&&!$('mNote').value.trim())throw Error('Indica el motivo para inmovilizar material en cuarentena.');
       if(!material)throw Error('Selecciona un material disponible en el origen.');
-      if(!positive(quantity)||Number(quantity)>material.quantity+1e-8)throw Error('Introduce una cantidad válida, sin superar '+material.quantity+' '+material.unit+' disponibles.');
+      let limit=destinationNeedsValidation(destination)?Number(material.quantity):Number(material.projects[project]||0);
+      if(!positive(quantity)||Number(quantity)>limit+1e-8)throw Error('Introduce una cantidad válida, sin superar '+limit+' '+material.unit+' disponibles para este movimiento.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
-        renderSummary();renderStock();renderMoves();renderMap();renderQuality();available();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
+        renderSummary();renderStock();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
-      try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
+      try{let result=await call('createReceipt',p);pendingReceipt='';$('supplier').value='';$('document').value='';$('documentUrl').value='';$('imputationCode').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
         await afterSave('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'),Number(result.quarantineTotal)>0?'quality':'stock')}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}
-      let x=availableStock().find(item=>item.project===p.project&&item.zone===p.origin&&item.materialId===p.lines[0].materialId);
-      if(!confirm('Mover '+p.lines[0].quantity+' '+x.unit+' de «'+x.description+'» desde '+p.origin+' hasta '+p.destination+'?'))return;
+      let x=physicalMaterials(p.origin).find(item=>item.materialId===p.lines[0].materialId);
+      if(!confirm('Mover '+p.lines[0].quantity+' '+x.unit+' de «'+x.description+'» desde '+p.origin+' hasta '+p.destination+' para '+p.project+'?'))return;
       moveSaving=true;pendingMove=p.batchId;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Guardando…';status('Registrando movimiento…','info');
       try{let result=await call('moveStock',p);pendingMove='';$('mQuantity').value='';$('mNote').value='';
-        await afterSave('Movimiento '+result.batchId.slice(0,8)+(result.duplicate?' ya registrado.':' registrado.'),'moves')}
+        await afterSave('Movimiento '+result.batchId.slice(0,8)+(result.duplicate?' ya registrado.':' registrado.')+(Number(result.projectTransfers)>0?' · '+result.projectTransfers+' traspaso(s) entre proyectos generado(s).':''),Number(result.projectTransfers)>0?'transfers':'moves')}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de repetir el traslado.','error')}
       finally{moveSaving=false;$('moveSubmit').disabled=false;$('moveSubmit').textContent='Registrar movimiento'}}
     async function confirmMove(batchId){if(actionBusy)return;if(!confirm('¿Validar que el material del lote '+batchId.slice(0,8)+' se ha recibido físicamente en destino?'))return;
@@ -529,7 +567,7 @@
       let csv='\uFEFF'+[header,...rows.map(x=>[x.description,x.reference,x.project,x.zone,x.quantity,x.unit])].map(row=>row.map(quote).join(';')).join('\r\n');
       let url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='existencias-almacen-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
     async function signedIn(result){credential=result.credential;$('loginError').hidden=true;
-      try{state=await call('bootstrap');state.zoneMapSupported=Array.isArray(state.zoneMap);state.zoneMap=state.zoneMap||[];$('login').hidden=true;$('app').hidden=false;$('identity').hidden=false;
+      try{state=await call('bootstrap');state.projectRules=state.projectRules||[];state.transfers=state.transfers||[];state.zoneMapSupported=Array.isArray(state.zoneMap);state.zoneMap=state.zoneMap||[];$('login').hidden=true;$('app').hidden=false;$('identity').hidden=false;
         document.querySelector('[data-view="quality"]').hidden=!state.quarantineSupported;$('zoneUseField').hidden=!state.quarantineSupported;$('receiptSuggestionsTools').hidden=!state.perLineZonesSupported;
         $('userName').textContent=state.user.name;$('userRole').textContent=state.user.role;
         document.querySelectorAll('.write').forEach(button=>button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role));
@@ -543,3 +581,4 @@
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
 </body>
 </html>
+
