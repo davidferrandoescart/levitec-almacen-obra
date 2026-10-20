@@ -104,6 +104,23 @@
     .map-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr);gap:18px}
     .floor-wrap{padding:18px;border:1px solid #dce6eb;border-radius:12px;background:#f8fafb}
     .floor-wrap svg{width:100%;height:auto;display:block}
+    .order-browser{display:grid;gap:13px;padding:17px;border:1px solid #dce6eb;border-radius:12px;background:#f7fafb;margin:15px 0 18px}
+    .order-browser-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+    .order-browser-head h3{margin:0;font-size:15px}
+    .order-browser-filters{display:grid;grid-template-columns:minmax(200px,2fr) minmax(140px,1fr);gap:10px}
+    .order-browser-filters input,.order-browser-filters select{width:100%;min-height:41px;border:1px solid #cbd7e0;border-radius:8px;padding:9px 11px;background:#fff}
+    .order-cards{display:grid;gap:9px;max-height:440px;overflow:auto;overscroll-behavior:contain}
+    .order-card{background:#fff;border:1px solid #dce6eb;border-radius:10px;padding:13px;display:grid;gap:8px}
+    .order-card.selected{border:2px solid #13999b;background:#effaf8;padding:12px}
+    .order-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .order-card-top strong{font-size:14px;color:#183248}
+    .order-card small{color:#667d8d;font-size:12px;line-height:1.5}
+    .order-card-details{padding:9px 11px;background:#f5f8fa;border-radius:8px;font-size:12px;color:#31526a}
+    .order-card-details summary{cursor:pointer;font-weight:750}
+    .order-card-details ul{margin:8px 0 0;padding-left:18px;max-height:190px;overflow:auto}
+    .order-card-details li{margin:5px 0}
+    .order-browser-empty{padding:15px;color:#60788a;text-align:center;background:#fff;border-radius:8px}
+    @media(max-width:650px){.order-browser-filters{grid-template-columns:1fr}.order-card-top{flex-direction:column}}
     .zone-list{display:grid;gap:9px;margin:15px 0}
     .zone-item{width:100%;text-align:left;border:1px solid #d7e4e8;background:#fff;border-radius:10px;padding:12px 14px;color:#17334a}
     .zone-item:hover,.zone-item.selected{border-color:#16a5a7;background:#eef8f7}
@@ -261,7 +278,14 @@
     </section>
     <section id="receipt" class="card panel" hidden>
       <div class="panel-top"><div><h2>Registrar recepción</h2><p>Trabaja contra el albarán que recibe el almacén. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
-      <div class="notice spacer" style="margin-bottom:14px"><label class="field"><span>Origen de la recepción</span><select id="siteOrder" onchange="selectSiteOrder()"><option value="">Sin pedido registrado · recepción libre</option></select></label><small id="siteOrderHint">Selecciona un pedido confirmado o registra material no previsto. Las recepciones parciales conservan cantidades pendientes.</small></div>
+      <div class="order-browser">
+        <div class="order-browser-head"><div><h3>Pedidos pendientes de recepción</h3><small class="muted">Busca por pedido, proveedor, referencia, descripción o proyecto. Puedes consultar las líneas antes de seleccionar.</small></div><button type="button" class="button secondary small" id="freeReceiptBtn" onclick="chooseSiteOrder('')">+ Recepción sin pedido</button></div>
+        <div class="order-browser-filters"><input id="orderSearch" type="search" placeholder="Buscar pedido, proveedor o material…" oninput="renderSiteOrderBrowser()" aria-label="Buscar pedidos y materiales"><select id="orderProjectFilter" onchange="renderSiteOrderBrowser()" aria-label="Filtrar pedidos por proyecto"><option value="">Todos los proyectos</option><option value="ZAZ081">ZAZ081</option><option value="ZAZ091">ZAZ091</option></select></div>
+        <div class="order-browser-head"><small id="orderResultsCount" class="muted" aria-live="polite">Cargando pedidos…</small><small id="orderSelectionInfo" class="muted">Recepción libre seleccionada</small></div>
+        <div id="orderCards" class="order-cards" aria-live="polite"></div>
+        <select id="siteOrder" onchange="selectSiteOrder()" hidden aria-label="Pedido vinculado"><option value="">Sin pedido registrado · recepción libre</option></select>
+        <small id="siteOrderHint">Selecciona un pedido confirmado o registra material no previsto. Las recepciones parciales conservan cantidades pendientes.</small>
+      </div>
       <div class="form-grid">
         <label class="field"><span>Proyecto de imputación *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select><small id="rProjectHint">Se completa automáticamente desde el código de obra cuando existe una regla; úsalo como selección manual si no se reconoce.</small></label>
         <label class="field"><span>Zona conforme por defecto *</span><select id="rZone" onchange="updateReceiptSuggestions()"></select><small>Solo para material conforme. La cuarentena se elige por línea cuando sea necesaria.</small></label>
@@ -605,11 +629,40 @@
       const select=$('siteOrder');if(!select)return;
       const previous=select.value;
       select.replaceChildren(new Option('Sin pedido registrado · recepción libre',''));
-      (state.siteOrders||[]).filter(o=>o.receiptStatus!=='COMPLETA').forEach(o=>{
-        const pending=o.lines.filter(l=>l.pending>0).length;
+      (state.siteOrders||[]).filter(o=>o.receiptStatus!=='COMPLETA'&&(o.lines||[]).some(l=>Number(l.pending)>0)).forEach(o=>{
+        const pending=o.lines.filter(l=>Number(l.pending)>0).length;
         select.add(new Option(o.projectId+' · '+(o.poNumber||o.requestId)+' · '+o.supplier+' · '+pending+' líneas pendientes',o.requestId));
       });
       if([...select.options].some(o=>o.value===previous))select.value=previous;
+      else if(previous){select.value='';$('siteOrderHint').textContent='El pedido seleccionado ya no está pendiente en este almacén. Selecciona otro pedido.';}
+      renderSiteOrderBrowser();
+    }
+    function chooseSiteOrder(requestId){
+      const select=$('siteOrder');
+      if(![...select.options].some(o=>o.value===requestId))return;
+      if(receiptSaving||requestId===select.value)return;
+      if(requestId!==select.value&&document.querySelector('#receiptLines .line')&&[...document.querySelectorAll('#receiptLines .line')].some(line=>line.querySelector('.receivedQty')?.value)&&!confirm('Cambiar de pedido reemplazará las líneas de esta recepción que aún no has guardado. ¿Continuar?'))return;
+      select.value=requestId;
+      if(!requestId){$('receiptLines').replaceChildren();addLine();$('supplier').value='';$('imputationCode').value='';$('siteOrderHint').textContent='Recepción libre: registra materiales no incluidos en pedidos de Site Control.';updateReceiptSuggestions();}
+      else selectSiteOrder();
+      renderSiteOrderBrowser();
+    }
+    function renderSiteOrderBrowser(){
+      const root=$('orderCards');if(!root)return;
+      const q=normalize($('orderSearch')?.value||'').trim(),project=$('orderProjectFilter')?.value||'';
+      const orders=(state.siteOrders||[]).filter(o=>o.receiptStatus!=='COMPLETA'&&(o.lines||[]).some(l=>Number(l.pending)>0));
+      const matches=orders.filter(o=>(!project||o.projectId===project)&&(!q||normalize([o.poNumber,o.requestId,o.supplier,o.projectId,o.expectedDeliveryDate,...(o.lines||[]).flatMap(l=>[l.reference,l.description])].join(' ')).includes(q)));
+      $('orderResultsCount').textContent=matches.length+' de '+orders.length+' pedidos pendientes';
+      const selected=$('siteOrder').value,selectedOrder=orders.find(o=>o.requestId===selected);
+      $('orderSelectionInfo').textContent=selectedOrder?'Seleccionado: '+(selectedOrder.poNumber||selectedOrder.requestId):'Recepción libre seleccionada';
+      $('freeReceiptBtn').classList.toggle('secondary',!!selectedOrder);
+      if(!matches.length){root.innerHTML='<div class="order-browser-empty">'+(orders.length?'No hay pedidos que coincidan con la búsqueda. Prueba con proveedor, referencia o descripción.':'No hay pedidos pendientes sincronizados para este almacén. Puedes registrar una recepción sin pedido.')+'</div>';return;}
+      root.innerHTML=matches.map(o=>{
+        const lines=(o.lines||[]).filter(l=>Number(l.pending)>0),active=o.requestId===selected;
+        const label=o.poNumber||o.requestId;
+        const list=lines.map(l=>'<li><b>'+esc(l.reference||'Sin referencia')+'</b> · '+esc(l.description||'')+' — <b>'+esc(l.pending)+' '+esc(l.unit||'ud')+' pendientes</b></li>').join('');
+        return '<article class="order-card'+(active?' selected':'')+'"><div class="order-card-top"><div><strong>'+esc(label)+'</strong> <span class="pill '+(o.receiptStatus==='PARCIAL'?'pending':'')+'">'+esc(o.receiptStatus==='PARCIAL'?'Recepción parcial':'Pendiente')+'</span><div><small>'+esc(o.supplier||'Proveedor sin indicar')+' · '+esc(o.projectId||'')+(o.expectedDeliveryDate?' · Prevista: '+esc(o.expectedDeliveryDate):'')+'</small></div></div><button type="button" class="button '+(active?'secondary':'')+' small" data-order-id="'+esc(o.requestId)+'" onclick="chooseSiteOrder(this.dataset.orderId)">'+(active?'Seleccionado':'Recepcionar')+'</button></div><details class="order-card-details"><summary>Ver '+lines.length+' líneas pendientes y materiales</summary><ul>'+list+'</ul></details></article>';
+      }).join('');
     }
     function selectSiteOrder(){
       const order=(state.siteOrders||[]).find(o=>o.requestId===$('siteOrder').value);
@@ -674,7 +727,7 @@
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';let labels=expectedReceiptLabels(p,result.labels||[]);$('supplier').value='';$('document').value='';$('documentUrl').value='';$('imputationCode').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        $('siteOrder').value='';await refresh();showReceiptLabels(labels);status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'));view('receipt',false)}
+        $('siteOrder').value='';await refresh();renderSiteOrderBrowser();showReceiptLabels(labels);status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'));view('receipt',false)}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}let x=physicalMaterials(p.origin).find(item=>item.materialId===p.lines[0].materialId);moveSaving=true;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Comprobando…';
