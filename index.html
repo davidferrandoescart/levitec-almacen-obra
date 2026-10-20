@@ -261,6 +261,7 @@
     </section>
     <section id="receipt" class="card panel" hidden>
       <div class="panel-top"><div><h2>Registrar recepción</h2><p>Trabaja contra el albarán que recibe el almacén. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
+      <div class="notice spacer" style="margin-bottom:14px"><label class="field"><span>Origen de la recepción</span><select id="siteOrder" onchange="selectSiteOrder()"><option value="">Sin pedido registrado · recepción libre</option></select></label><small id="siteOrderHint">Selecciona un pedido confirmado o registra material no previsto. Las recepciones parciales conservan cantidades pendientes.</small></div>
       <div class="form-grid">
         <label class="field"><span>Proyecto de imputación *</span><select id="rProject" onchange="updateReceiptSuggestions()"></select><small id="rProjectHint">Se completa automáticamente desde el código de obra cuando existe una regla; úsalo como selección manual si no se reconoce.</small></label>
         <label class="field"><span>Zona conforme por defecto *</span><select id="rZone" onchange="updateReceiptSuggestions()"></select><small>Solo para material conforme. La cuarentena se elige por línea cuando sea necesaria.</small></label>
@@ -596,6 +597,39 @@
     function positive(value){let n=Number(value);return Number.isFinite(n)&&n>0&&Math.round(n*1000)===n*1000}
     function nonNegative(value){let n=Number(value);return Number.isFinite(n)&&n>=0&&Math.round(n*1000)===n*1000}
     function value(line,cls){let control=line.querySelector('input.'+cls+', select.'+cls+', textarea.'+cls);return control?control.value.trim():''}
+    function renderSiteOrderSelector(){
+      const select=$('siteOrder');if(!select)return;
+      const previous=select.value;
+      select.replaceChildren(new Option('Sin pedido registrado · recepción libre',''));
+      (state.siteOrders||[]).filter(o=>o.receiptStatus!=='COMPLETA').forEach(o=>{
+        const pending=o.lines.filter(l=>l.pending>0).length;
+        select.add(new Option(o.projectId+' · '+(o.poNumber||o.requestId)+' · '+o.supplier+' · '+pending+' líneas pendientes',o.requestId));
+      });
+      if([...select.options].some(o=>o.value===previous))select.value=previous;
+    }
+    function selectSiteOrder(){
+      const order=(state.siteOrders||[]).find(o=>o.requestId===$('siteOrder').value);
+      const hint=$('siteOrderHint');
+      if(!order){hint.textContent='Recepción libre: registra cualquier material, aunque no figure en Site Control.';return;}
+      $('rProject').value=order.projectId;
+      $('supplier').value=order.supplier;
+      $('imputationCode').value=order.poNumber||'';
+      $('receiptLines').replaceChildren();
+      order.lines.filter(l=>l.pending>0).forEach(l=>{
+        addLine();const line=$('receiptLines').lastElementChild;
+        line.dataset.siteLineId=l.lineId;
+        line.querySelector('.reference').value=l.reference;
+        line.querySelector('.description').value=l.description;
+        const unit=line.querySelector('.unit');
+        if(![...unit.options].some(o=>o.value===l.unit))unit.add(new Option(l.unit,l.unit));
+        unit.value=l.unit;
+        line.querySelector('.albaranQty').value=l.pending;
+        line.querySelector('.receivedQty').value=l.pending;
+        updateReceiptLine(line);
+      });
+      hint.textContent='Pedido '+(order.poNumber||order.requestId)+' · Introduce la cantidad realmente recibida en cada línea. Elimina las no recibidas; si recibes otros materiales, registra otra recepción libre.';
+      updateReceiptSuggestions();
+    }
     function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
       if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, zona conforme, proveedor y número de albarán o factura.');
       if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
@@ -605,7 +639,19 @@
         item.acceptedQty=String(Math.round((received-q)*1000)/1000);item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
         item.quarantineZone=line.querySelector('.quarantine-zone')?.value||'';item.quarantineReason=line.querySelector('.quarantine-reason')?.value||'';
         if(q>0&&(!item.quarantineZone||!item.quarantineReason))throw Error('Selecciona zona y motivo de cuarentena en la línea '+(i+1)+'.');return item});
-      return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),project:$('rProject').value,imputationCode:$('imputationCode').value.trim(),zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
+      const orderId=$('siteOrder').value;
+      if(orderId){
+        const order=(state.siteOrders||[]).find(o=>o.requestId===orderId);
+        if(!order)throw Error('El pedido ya no está disponible. Actualiza el almacén.');
+        if(order.projectId!==$('rProject').value)throw Error('El proyecto no coincide con el pedido.');
+        const linked=new Set();
+        lines.forEach((l,i)=>{
+          const lineId=document.querySelectorAll('#receiptLines .line')[i].dataset.siteLineId;
+          if(!lineId||linked.has(lineId))throw Error('Revisa las líneas del pedido seleccionado.');
+          linked.add(lineId);l.siteLineId=lineId;
+        });
+      }
+      return{batchId:pendingReceipt||'op_'+crypto.randomUUID(),siteOrderId:orderId,project:$('rProject').value,imputationCode:$('imputationCode').value.trim(),zone:$('rZone').value,supplier,document:doc,documentUrl:url,note:$('rNote').value.trim(),lines}}
     function moveData(){let project=$('mProject').value,origin=$('mOrigin').value,destination=$('mDestination').value,id=$('mMaterial').value,quantity=$('mQuantity').value;
       let material=physicalMaterials(origin).find(x=>x.materialId===id);
       if(!project||!origin||!destination||origin===destination)throw Error('Elige proyecto de consumo y dos ubicaciones distintas.');
@@ -615,7 +661,7 @@
       if(!positive(quantity)||Number(quantity)>limit+1e-8)throw Error('Introduce una cantidad válida, sin superar '+limit+' '+material.unit+' disponibles para este movimiento.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     async function refresh(manual=false){if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock');state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];renderSiteOrderSelector();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderSummary();renderStock();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
@@ -624,7 +670,7 @@
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';let labels=expectedReceiptLabels(p,result.labels||[]);$('supplier').value='';$('document').value='';$('documentUrl').value='';$('imputationCode').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        await refresh();showReceiptLabels(labels);status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'));view('receipt',false)}
+        $('siteOrder').value='';await refresh();showReceiptLabels(labels);status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'));view('receipt',false)}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}let x=physicalMaterials(p.origin).find(item=>item.materialId===p.lines[0].materialId);moveSaving=true;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Comprobando…';
@@ -679,6 +725,7 @@
         state.materialPolicies=state.materialPolicies||[];
         state.transferRequests=state.transferRequests||[];
         state.siteMaterialRequests=state.siteMaterialRequests||[];
+        state.siteOrders=state.siteOrders||[];
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
@@ -740,6 +787,7 @@
     }
 
     function hydrateWarehouseControls(){
+      renderSiteOrderSelector();
       setChoices('rProject',state.projects,'CODIGO','CODIGO');
       setChoices('mProject',state.projects,'CODIGO','CODIGO');
       setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');
@@ -759,7 +807,9 @@
       try{
         let result=await call('bootstrap',{warehouseId:id});
         state=Object.assign({},state,result);
+        $('siteOrder').value='';
         state.siteMaterialRequests=state.siteMaterialRequests||[];
+        state.siteOrders=state.siteOrders||[];
         state.zoneMap=state.zoneMap||[];
         state.zoneMapSupported=Array.isArray(state.zoneMap);
 
