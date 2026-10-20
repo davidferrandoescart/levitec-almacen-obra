@@ -184,6 +184,7 @@
       <button class="tab" type="button" data-view="quality" onclick="view('quality')">Cuarentena <span id="navQuarantine"></span></button>
       <button class="tab" type="button" data-view="notifications" onclick="view('notifications')">Notificaciones <span id="navNotifications"></span></button>
       <button class="tab" type="button" data-view="transfers" onclick="view('transfers')">Traspasos <span id="navTransfers"></span></button>
+      <button class="tab" type="button" data-view="logistics" onclick="view('logistics')">Logística <span id="navLogistics"></span></button>
       <button class="tab" type="button" data-view="moves" onclick="view('moves')">Movimientos <span id="navPending"></span></button>
       <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
       <button class="tab write" type="button" data-view="transfer" onclick="view('transfer')">Mover material</button>
@@ -308,6 +309,25 @@
       <div id="receiptIncidentsSummary" class="notice warning spacer" hidden></div>
       <div class="form-footer"><button id="receiptSubmit" type="button" class="button" onclick="saveReceipt()">Registrar recepción</button></div>
     </section>
+
+    <section id="logistics" class="card panel" hidden>
+      <div class="panel-top"><div><h2>Traslados entre ubicaciones logísticas</h2><p>Solicitudes de encargados y salidas directas de almacén. La salida descuenta stock del origen; la recepción incorpora únicamente lo confirmado en destino.</p></div></div>
+      <div class="notice spacer">Para traslados dentro de la misma nave utiliza «Mover material». Aquí se gestionan las transferencias entre naves y campas.</div>
+      <div class="form-grid three spacer">
+        <label class="field"><span>Modalidad</span><select id="lMode" onchange="logisticsChoices()"><option value="SOLICITUD">Solicitar traslado</option><option value="DIRECTA">Salida directa</option></select></label>
+        <label class="field"><span>Origen</span><select id="lOrigin" onchange="logisticsChoices()"></select></label>
+        <label class="field"><span>Destino</span><select id="lDestination" onchange="logisticsChoices()"></select></label>
+        <label class="field"><span>Proyecto</span><select id="lProject" onchange="logisticsChoices()"></select></label>
+        <label class="field"><span>Zona origen</span><select id="lOriginZone" onchange="logisticsMaterialChoices()"></select></label>
+        <label class="field"><span>Zona destino</span><select id="lDestinationZone"></select></label>
+        <label class="field"><span>Material disponible</span><select id="lMaterial"></select></label>
+        <label class="field"><span>Cantidad</span><input id="lQty" type="number" step="0.001" min="0.001" placeholder="0"></label>
+        <label class="field"><span>Observaciones</span><input id="lNote" maxlength="250" placeholder="Motivo / zona de entrega"></label>
+      </div>
+      <div class="form-footer"><button type="button" class="button" onclick="submitLogistics()">Crear solicitud / salida</button></div>
+      <div class="divider"></div><h3>Seguimiento de movimientos</h3>
+      <div id="logisticsList" class="spacer"></div>
+    </section>
     <section id="transfer" class="card panel" hidden>
       <div class="panel-top"><div><h2>Mover material</h2><p>Selecciona el material manualmente o escanea su QR de referencia.</p></div><div class="actions"><button type="button" class="button secondary" onclick="scanQr()">▣ Escanear QR</button></div></div>
       <div class="form-grid two"><label class="field"><span>QR / referencia</span><input id="qrCode" placeholder="CELLARIQ:MAT:63838EKP0" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupQr()}"><small>También puedes escribir directamente la referencia del material.</small></label><div class="form-footer"><button type="button" class="button secondary" onclick="lookupQr()">Localizar material</button></div></div>
@@ -355,7 +375,7 @@
     })}
     function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
       items.forEach(item=>el.add(new Option(item[label]||item[key],item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
-    const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Recepciones pendientes y solicitudes de uso de stock protegido.'],transfers:['Traspasos','Consumos cruzados y saldos pendientes de compensar entre proyectos.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
+    const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Recepciones pendientes y solicitudes de uso de stock protegido.'],transfers:['Traspasos','Consumos cruzados y saldos pendientes de compensar entre proyectos.'],logistics:['Logística','Solicitudes, salidas y confirmaciones entre naves y campas.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
     function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
       $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(['moves','notifications','transfers'].includes(id)&&load)refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
@@ -767,10 +787,10 @@
       if(!positive(quantity)||Number(quantity)>limit+1e-8)throw Error('Introduce una cantidad válida, sin superar '+limit+' '+material.unit+' disponibles para este movimiento.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     async function refresh(manual=false){const requestedWarehouse=state.currentWarehouse?.id,epoch=warehouseEpoch;if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
-        renderSummary();renderStock();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
+        renderSummary();renderStock();renderLogistics();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     function renderReceiptIncidents(){
@@ -826,6 +846,75 @@
       let quote=v=>'"'+String(v??'').replace(/"/g,'""')+'"',header=['Material','Referencia','Proyecto','Zona','Disponible','Unidad'];
       let csv='\uFEFF'+[header,...rows.map(x=>[x.description,x.reference,x.project,x.zone,x.quantity,x.unit])].map(row=>row.map(quote).join(';')).join('\r\n');
       let url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='existencias-almacen-'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+
+    // v1.4: formulario y seguimiento de traslados entre ubicaciones independientes.
+    let pendingLogisticsClientId='';
+    let logisticsCatalogState={warehouses:[],zones:[],stock:[]}, logisticsFetchSerial=0;
+    async function logisticsChoices(){
+      if(!state.user)return;
+      const origin=$('lOrigin').value||state.currentWarehouse?.id||'',dest=$('lDestination').value;
+      const project=$('lProject').value||(state.projects||[]).find(p=>p.CODIGO!=='GENERAL')?.CODIGO||'';
+      setChoices('lProject',(state.projects||[]).filter(p=>p.CODIGO!=='GENERAL'),'CODIGO','CODIGO','Proyecto');$('lProject').value=project;
+      const serial=++logisticsFetchSerial;
+      try{
+        const catalog=await call('logisticsCatalog',{originWarehouse:origin,destinationWarehouse:dest,project});
+        if(serial!==logisticsFetchSerial)return;
+        logisticsCatalogState=catalog;
+        const all=catalog.warehouses||[];
+        setChoices('lOrigin',all.map(w=>({id:w.id,label:w.name+' · '+w.id})),'id','label','Origen');
+        setChoices('lDestination',all.map(w=>({id:w.id,label:w.name+' · '+w.id})),'id','label','Destino');
+        if(all.some(w=>w.id===origin))$('lOrigin').value=origin;
+        if(all.some(w=>w.id===dest))$('lDestination').value=dest;
+        const zones=catalog.zones||[];
+        setChoices('lOriginZone',zones.filter(z=>z.warehouseId===$('lOrigin').value).map(z=>({id:z.code,label:z.name})),'id','label','Zona origen');
+        setChoices('lDestinationZone',zones.filter(z=>z.warehouseId===$('lDestination').value).map(z=>({id:z.code,label:z.name})),'id','label','Zona destino');
+        const stock=catalog.stock||[];
+        setChoices('lMaterial',stock.filter(x=>x.zone===$('lOriginZone').value).map(x=>({id:x.materialId,label:(x.reference||'')+' · '+x.description+' · '+x.quantity+' '+x.unit})),'id','label','Material');
+      }catch(e){if(serial===logisticsFetchSerial)status('No se pudo consultar la disponibilidad logística: '+e.message,'error')}
+    }
+    function logisticsMaterialChoices(){
+      const stock=logisticsCatalogState.stock||[];
+      setChoices('lMaterial',stock.filter(x=>x.zone===$('lOriginZone').value).map(x=>({id:x.materialId,label:(x.reference||'')+' · '+x.description+' · '+x.quantity+' '+x.unit})),'id','label','Material');
+    }
+    async function submitLogistics(){
+      if(actionBusy)return;
+      const mode=$('lMode').value,originWarehouse=$('lOrigin').value,destinationWarehouse=$('lDestination').value;
+      if(originWarehouse===destinationWarehouse)return throwFailLogistics('El origen y destino deben ser diferentes.');
+      if(mode==='DIRECTA'&&originWarehouse!==state.currentWarehouse?.id)return throwFailLogistics('Para una salida directa, selecciona primero el origen en la cabecera.');
+      const data={clientId:pendingLogisticsClientId||(pendingLogisticsClientId='LOGCLIENT-'+crypto.randomUUID()),mode,originWarehouse,destinationWarehouse,project:$('lProject').value,originZone:$('lOriginZone').value,destinationZone:$('lDestinationZone').value,materialId:$('lMaterial').value,quantity:$('lQty').value,note:$('lNote').value.trim()};
+      if(!data.destinationZone)return throwFailLogistics('Selecciona una zona de destino.');
+      if(!data.project||!data.materialId||!data.originZone||!positive(data.quantity))return throwFailLogistics('Completa proyecto, material, zonas y cantidad válida.');
+      if(!confirm('¿Crear '+(mode==='DIRECTA'?'salida directa':'solicitud')+' de '+data.quantity+' hacia '+destinationWarehouse+'?'))return;
+      actionBusy=true;
+      try{const r=await call('createLogistics',data);if(mode==='DIRECTA')await call('dispatchLogistics',{id:r.id});pendingLogisticsClientId='';$('lQty').value='';$('lNote').value='';await afterSave('Movimiento '+r.id+' registrado.','logistics');}
+      catch(e){fail(e)}finally{actionBusy=false}
+    }
+    function throwFailLogistics(message){status(message,'error');return null}
+    function renderLogistics(){
+      if(!$('logisticsList'))return;
+      const rows=state.logistics||[];
+      $('navLogistics').textContent=rows.filter(r=>['SOLICITADO','EN_TRANSITO','INCIDENCIA'].includes(r.ESTADO)).length?'· '+rows.filter(r=>['SOLICITADO','EN_TRANSITO','INCIDENCIA'].includes(r.ESTADO)).length:'';
+      $('logisticsList').innerHTML=rows.length?rows.map(r=>{
+        const canDispatch=['ADMIN','ALMACEN','ENCARGADO','AYUDANTE'].includes(state.user?.role)&&r.ORIGEN_ALMACEN===state.currentWarehouse?.id;
+        const canReceive=r.DESTINO_ALMACEN===state.currentWarehouse?.id&&!!state.canReceive;
+        let actions='';
+        if(r.ESTADO==='SOLICITADO'&&canDispatch)actions='<button class="button small" data-id="'+esc(r.ID)+'" onclick="logisticsAction(this.dataset.id,&quot;dispatch&quot;)">Confirmar salida</button> <button class="button secondary small" data-id="'+esc(r.ID)+'" onclick="logisticsAction(this.dataset.id,&quot;cancel&quot;)">Cancelar</button>';
+        if(r.ESTADO==='EN_TRANSITO'&&canReceive)actions='<button class="button small" data-id="'+esc(r.ID)+'" onclick="logisticsAction(this.dataset.id,&quot;receive&quot;)">Confirmar recepción</button>';
+        return '<div class="line"><div class="line-title"><h3>'+esc(r.REFERENCIA||r.DESCRIPCION)+' · '+esc(r.PROYECTO)+'</h3><span class="pill '+(r.ESTADO==='RECIBIDO'?'received':'pending')+'">'+esc(r.ESTADO)+'</span></div><p>'+esc(r.CANTIDAD)+' '+esc(r.UNIDAD)+' · '+esc(r.ORIGEN_ALMACEN)+' ('+esc(r.ORIGEN_ZONA)+') → '+esc(r.DESTINO_ALMACEN)+' ('+esc(r.DESTINO_ZONA)+')</p><p class="muted">'+esc(r.MODO)+' · '+esc(r.SOLICITADO_POR)+' · '+esc(r.ID)+'</p>'+(r.INCIDENCIA?'<p class="notice warning">'+esc(r.INCIDENCIA)+'</p>':'')+'<div class="actions">'+actions+'</div></div>';
+      }).join(''):'<p class="muted">Todavía no hay movimientos logísticos.</p>';
+    }
+    async function logisticsAction(id,kind){if(actionBusy)return;const r=(state.logistics||[]).find(x=>x.ID===id);if(!r)return;
+      let data={id},action=kind==='dispatch'?'dispatchLogistics':kind==='cancel'?'cancelLogistics':'receiveLogistics';
+      if(kind==='receive'){
+        const answer=prompt('Cantidad física recibida ('+r.UNIDAD+'). Expedida: '+r.CANTIDAD,r.CANTIDAD);
+        if(answer===null)return;
+        if(!Number.isFinite(Number(answer))||Number(answer)<0||Number(answer)>Number(r.CANTIDAD)){status('Cantidad recibida no válida.','error');return}
+        data.receivedQuantity=Number(answer);
+        if(Number(answer)<Number(r.CANTIDAD)){const reason=prompt('Hay una diferencia. Indica la incidencia / observaciones:');if(!reason?.trim())return;data.note=reason.trim()}
+      }else if(!confirm(kind==='dispatch'?'¿Confirmar salida física y descontar stock del origen?':'¿Cancelar la solicitud antes de expedir?'))return;
+      actionBusy=true;try{await call(action,data);await afterSave('Movimiento actualizado.','logistics')}catch(e){fail(e)}finally{actionBusy=false}
+    }
+
     async function signedIn(result){
       credential=result.credential;
       $('loginError').hidden=true;
@@ -841,10 +930,11 @@
         state.siteMaterialRequests=state.siteMaterialRequests||[];
         state.siteOrders=state.siteOrders||[];
         state.receiptIncidents=state.receiptIncidents||[];
+        state.logistics=state.logistics||[];
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
-        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.3';
+        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.4';
 
         $('login').hidden=true;
         $('app').hidden=false;
@@ -858,6 +948,7 @@
         $('userRole').textContent=state.user.role;
 
         renderWarehouseSelector();
+        logisticsChoices();renderLogistics();
         applyWarehouseIdentity();
 
         document.querySelectorAll('.write').forEach(button=>
@@ -942,6 +1033,7 @@
 
         applyWarehouseIdentity();
         hydrateWarehouseControls();
+        logisticsChoices();renderLogistics();
 
         $('receiptLines').replaceChildren();
         addLine();
