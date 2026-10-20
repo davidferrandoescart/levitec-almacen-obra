@@ -169,7 +169,7 @@
     <div class="brand"><div class="brand-mark" aria-hidden="true">L</div><div><small>LEVITEC · SITE CONTROL</small><strong>Warehouse</strong></div></div>
     <div id="identity" class="identity" hidden>
   <div class="warehouse-switch">
-    <label for="warehouseSelector">Almacén</label>
+    <label for="warehouseSelector">Ubicación logística</label>
     <select id="warehouseSelector" onchange="changeWarehouse()"></select>
   </div>
   <div><b id="userName"></b><span id="userRole"></span><small id="warehouseIdentity"></small></div>
@@ -279,7 +279,7 @@
       </div>
     </section>
     <section id="receipt" class="card panel" hidden>
-      <div class="panel-top"><div><h2>Registrar recepción</h2><p>Trabaja contra el albarán que recibe el almacén. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
+      <div class="panel-top"><div><h2>Registrar recepción</h2><p id="receiptDestinationHint">Trabaja contra el albarán que recibe la ubicación seleccionada. No necesitas conocer el pedido de compra: compara lo indicado en el albarán con lo contado físicamente y separa directamente lo no conforme.</p></div></div>
       <div class="order-browser">
         <div class="order-browser-head"><div><h3>Pedidos pendientes de recepción</h3><small class="muted">Busca por pedido, proveedor, referencia, descripción o proyecto. Puedes consultar las líneas antes de seleccionar.</small></div><button type="button" class="button secondary small" id="freeReceiptBtn" onclick="chooseSiteOrder('')">+ Recepción sin pedido</button></div>
         <div class="order-browser-filters"><input id="orderSearch" type="search" placeholder="Buscar pedido, proveedor o material…" oninput="renderSiteOrderBrowser()" aria-label="Buscar pedidos y materiales"><select id="orderProjectFilter" onchange="renderSiteOrderBrowser()" aria-label="Filtrar pedidos por proyecto"><option value="">Todos los proyectos</option><option value="ZAZ081">ZAZ081</option><option value="ZAZ091">ZAZ091</option></select></div>
@@ -844,7 +844,7 @@
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
-        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.0';
+        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.3';
 
         $('login').hidden=true;
         $('app').hidden=false;
@@ -861,7 +861,7 @@
         applyWarehouseIdentity();
 
         document.querySelectorAll('.write').forEach(button=>
-          button.hidden=!['ALMACEN','ADMIN'].includes(state.user.role)
+          button.hidden=button.dataset.view==='receipt'?!state.canReceive:!['ALMACEN','ADMIN'].includes(state.user.role)
         );
 
         hydrateWarehouseControls();
@@ -899,6 +899,15 @@
       let w=state.currentWarehouse||{};
       $('warehouseIdentity').textContent=[w.campus,w.discipline,w.warehouseRole].filter(Boolean).join(' · ');
       $('layoutWarehouseTitle').textContent=(w.name||w.id||'Almacén')+' · layout';
+      const campa=w.type==='CAMPA';
+      const mapButton=document.querySelector('.tab[data-view="map"]');if(mapButton)mapButton.hidden=campa;
+      if(campa&&activeView==='map')view('stock',false);
+      const hint=$('receiptDestinationHint');if(hint)hint.textContent=campa?'Recepción directa en '+(w.name||'campa')+'. El encargado o ayudante autorizado registra el albarán, las cantidades y las incidencias. El material queda en campa sin pasar por una nave.':'Recepción en '+(w.name||'nave')+'. El almacenero registra el albarán, las cantidades y las incidencias.';
+      const canReceive=!!state.canReceive;
+      const receiptButton=document.querySelector('.tab[data-view="receipt"]');if(receiptButton)receiptButton.hidden=!canReceive;
+      const transferButton=document.querySelector('.tab[data-view="transfer"]');if(transferButton)transferButton.hidden=!['ALMACEN','ADMIN'].includes(state.user?.role)||campa;
+      if(activeView==='receipt'&&!canReceive)view('stock',false);
+      if(activeView==='transfer'&&campa)view('stock',false);
     }
 
     function hydrateWarehouseControls(){
