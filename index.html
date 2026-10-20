@@ -97,6 +97,8 @@
     .line-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
     .line-grid{display:grid;grid-template-columns:2fr 1.2fr 1.2fr .8fr 1fr 1fr;gap:12px}
     .line-grid .incident{grid-column:span 3}
+    .receipt-incident-note{color:#9a4c16;font-weight:700;margin:7px 0 0;line-height:1.5}
+    .order-reference-field input{background:#edf3f8;color:#41566c;font-weight:700}
     .receipt-result{margin-top:10px;padding:10px 12px;border-radius:8px;background:#f4f8fa;color:#36566b;font-size:12px;font-weight:700}
     .receipt-result.warning{background:#fff4df;color:#8a5a0a;border:1px solid #f0d49b}
     .quarantine-fields{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;padding:12px;border:1px solid #ecd19c;border-radius:9px;background:#fffaf1}
@@ -303,6 +305,7 @@
       <div id="receiptLines"></div>
       <div class="form-footer" style="justify-content:flex-start;margin-top:12px"><button type="button" class="button secondary small" onclick="addLine()">+ Añadir otra línea</button></div>
       <div id="receiptLabels" class="notice spacer" hidden></div><div id="receiptSuggestionsTools" class="tools spacer" hidden><button type="button" class="button secondary small" onclick="assignSuggestedZones()">Aplicar sugerencias a las líneas sin zona</button><small class="muted">Comprueba las sugerencias antes de registrar.</small></div>
+      <div id="receiptIncidentsSummary" class="notice warning spacer" hidden></div>
       <div class="form-footer"><button id="receiptSubmit" type="button" class="button" onclick="saveReceipt()">Registrar recepción</button></div>
     </section>
     <section id="transfer" class="card panel" hidden>
@@ -592,7 +595,7 @@
       else if(destinationNeedsValidation(destination))text+=' Quedará pendiente de validación en destino.';
       $('moveSummary').textContent=text}
     function addLine(){let d=document.createElement('div');d.className='line';
-      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field"><span>Referencia *</span><input class="reference" placeholder="Referencia inequívoca" maxlength="80" oninput="materialReferenceChanged(this)"><small class="material-state"></small></label><label class="field"><span>Descripción *</span><input class="description" placeholder="Se autocompleta si la referencia existe" maxlength="200" oninput="updateReceiptSuggestions()"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit" onchange="updateReceiptLine(this.closest(\'.line\'))"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Cantidad en albarán *</span><input class="albaranQty" type="number" inputmode="decimal" step="0.001" min="0.001" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>Recibida físicamente *</span><input class="receivedQty" type="number" inputmode="decimal" step="0.001" min="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>A cuarentena</span><input class="quarantineQty" type="number" inputmode="decimal" step="0.001" min="0" value="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field per-line-feature"><span>Ubicación conforme</span><select class="line-zone" onchange="updateReceiptLine(this.closest(\'.line\'))"><option value="">Zona conforme por defecto</option></select></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label></div><div class="quarantine-fields" hidden><label class="field"><span>Zona de cuarentena *</span><select class="quarantine-zone"></select></label><label class="field"><span>Motivo *</span><select class="quarantine-reason"><option value="">Selecciona motivo</option><option>Dañado / roto</option><option>Defecto aparente</option><option>Material incorrecto</option><option>Documentación pendiente</option><option>Pendiente inspección de Calidad</option><option>Otro</option></select></label><label class="field"><span>Detalle</span><input class="incident" maxlength="250" placeholder="Daño observado, falta documental, referencia incorrecta…"></label></div><div class="receipt-result">Introduce cantidades de albarán y recepción física.</div><p class="count zone-suggestion" aria-live="polite"></p>';
+      d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" onclick="removeLine(this)">Quitar</button></div><div class="line-grid"><label class="field order-reference-field" hidden><span>Referencia solicitada (Site Control)</span><input class="order-reference" readonly tabindex="-1"></label><label class="field"><span>Referencia física recibida *</span><input class="reference" placeholder="Referencia inequívoca" maxlength="80" oninput="materialReferenceChanged(this)"><small class="material-state"></small></label><label class="field"><span>Descripción *</span><input class="description" placeholder="Se autocompleta si la referencia existe" maxlength="200" oninput="updateReceiptSuggestions()"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit" onchange="updateReceiptLine(this.closest(\'.line\'))"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Cantidad en albarán *</span><input class="albaranQty" type="number" inputmode="decimal" step="0.001" min="0.001" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>Recibida físicamente *</span><input class="receivedQty" type="number" inputmode="decimal" step="0.001" min="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field"><span>A cuarentena</span><input class="quarantineQty" type="number" inputmode="decimal" step="0.001" min="0" value="0" oninput="updateReceiptLine(this.closest(\'.line\'))"></label><label class="field per-line-feature"><span>Ubicación conforme</span><select class="line-zone" onchange="updateReceiptLine(this.closest(\'.line\'))"><option value="">Zona conforme por defecto</option></select></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" onchange="updateReceiptSuggestions()"></label></div><div class="quarantine-fields" hidden><label class="field"><span>Zona de cuarentena *</span><select class="quarantine-zone"></select></label><label class="field"><span>Motivo *</span><select class="quarantine-reason"><option value="">Selecciona motivo</option><option>Dañado / roto</option><option>Defecto aparente</option><option>Material incorrecto</option><option>Documentación pendiente</option><option>Pendiente inspección de Calidad</option><option>Otro</option></select></label><label class="field"><span>Detalle</span><input class="incident" maxlength="250" placeholder="Daño observado, falta documental, referencia incorrecta…"></label></div><div class="receipt-result">Introduce cantidades de albarán y recepción física.</div><p class="count receipt-incident-note" aria-live="polite"></p><p class="count zone-suggestion" aria-live="polite"></p>';
       d.querySelectorAll('.per-line-feature,.zone-suggestion').forEach(el=>el.hidden=!state.perLineZonesSupported);$('receiptLines').append(d);fillLineZones(d);numberLines();updateReceiptSuggestions()}
     function normalizedReference(v){return String(v||'').trim().toUpperCase()}
     function materialReferenceChanged(input){input.value=input.value.toUpperCase();let line=input.closest('.line'),ref=normalizedReference(input.value),material=(state.materials||[]).find(m=>normalizedReference(m.REFERENCIA)===ref),desc=line.querySelector('.description'),unit=line.querySelector('.unit'),maker=line.querySelector('.manufacturer'),cat=line.querySelector('.category'),hint=line.querySelector('.material-state');
@@ -600,12 +603,54 @@
       else{desc.readOnly=false;unit.disabled=false;maker.readOnly=false;hint.textContent=ref?'Referencia nueva · completa descripción y unidad.':''}updateReceiptSuggestions()}
     function fillLineZones(line){let select=line.querySelector('.line-zone'),selected=select?.value||'';if(select){select.replaceChildren(new Option('Zona conforme por defecto',''));(state.zones||[]).filter(z=>z.AREA==='ALMACEN').forEach(z=>select.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));select.value=selected}
       let q=line.querySelector('.quarantine-zone'),qSelected=q?.value||'';if(q){q.replaceChildren();(state.zones||[]).filter(z=>z.AREA==='CUARENTENA').forEach(z=>q.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));if(qSelected&&[...q.options].some(o=>o.value===qSelected))q.value=qSelected}}
-    function updateReceiptLine(line){if(!line)return;let alb=Number(value(line,'albaranQty')),received=Number(value(line,'receivedQty')),q=Number(value(line,'quarantineQty')||0),unit=value(line,'unit')||'ud',result=line.querySelector('.receipt-result'),qbox=line.querySelector('.quarantine-fields');
-      let haveAlb=Number.isFinite(alb)&&alb>0,haveReceived=Number.isFinite(received)&&received>=0,validQ=Number.isFinite(q)&&q>=0&&(!haveReceived||q<=received),accepted=haveReceived&&validQ?Math.max(0,received-q):0;
-      qbox.hidden=!(validQ&&q>0);receiptZoneHint();
-      if(!haveAlb||!haveReceived){result.className='receipt-result';result.textContent='Introduce cantidades de albarán y recepción física.';return}
-      if(!validQ){result.className='receipt-result warning';result.textContent='La cantidad en cuarentena no puede superar lo recibido físicamente.';return}
-      let diff=Math.abs(alb-received)>0.0005;result.className='receipt-result'+(diff?' warning':'');result.textContent='Conforme: '+accepted+' '+unit+' · Cuarentena: '+q+' '+unit+(diff?' · DIFERENCIA: albarán '+alb+' '+unit+' / físico '+received+' '+unit:' · Albarán y recepción física coinciden')}
+    function updateReceiptLine(line){
+      if(!line)return;
+      const alb=Number(value(line,'albaranQty')),received=Number(value(line,'receivedQty'));
+      const hasOrder=!!line.dataset.siteLineId,expected=normalizedReference(value(line,'order-reference'));
+      const actual=normalizedReference(value(line,'reference'));
+      const mismatch=hasOrder&&expected!==actual;
+      const pending=hasOrder?Number(line.dataset.orderPending||0):0;
+      const excess=hasOrder&&!mismatch?Math.max(0,Math.round((received-pending)*1000)/1000):0;
+      const qInput=line.querySelector('.quarantineQty');
+      const requiredQ=mismatch?Math.max(0,received):excess;
+      const oldAuto=Number(line.dataset.autoQuarantine||0);
+      const oldQ=Number(qInput.value||0);
+      // Nunca se reduce una cuarentena manual; sí se recalcula la autogenerada.
+      if(hasOrder&&Number.isFinite(received)&&received>=0){
+        const manualPart=Math.max(0,oldQ-oldAuto);
+        const next=Math.min(received,Math.max(requiredQ,Math.round((requiredQ+manualPart)*1000)/1000));
+        qInput.value=String(next);
+        line.dataset.autoQuarantine=String(requiredQ);
+      }
+      const q=Number(qInput.value||0),unit=value(line,'unit')||'ud';
+      const result=line.querySelector('.receipt-result'),qbox=line.querySelector('.quarantine-fields');
+      const note=line.querySelector('.receipt-incident-note');
+      const validQ=Number.isFinite(q)&&q>=0&&q<=received;
+      const accepted=validQ?Math.max(0,Math.round((received-q)*1000)/1000):0;
+      qbox.hidden=!(validQ&&q>0);
+      if(q>0){
+        const reason=qbox.querySelector('.quarantine-reason');
+        if(mismatch)reason.value='Material incorrecto';
+        else if(excess>0&&(!reason.value||reason.value==='Material incorrecto')){
+          if(![...reason.options].some(x=>x.value==='Exceso sobre pedido'))reason.add(new Option('Exceso sobre pedido','Exceso sobre pedido'));
+          reason.value='Exceso sobre pedido';
+        }
+      }
+      receiptZoneHint();
+      if(!Number.isFinite(alb)||alb<=0||!Number.isFinite(received)||received<0){
+        result.className='receipt-result';result.textContent='Introduce cantidades válidas.';return;
+      }
+      if(!validQ){result.className='receipt-result warning';result.textContent='Cuarentena superior a cantidad recibida.';return;}
+      const difference=Math.abs(alb-received)>0.0005;
+      const issues=[];
+      if(mismatch)issues.push('REFERENCIA DISTINTA: '+expected+' → '+actual+'; bloqueo íntegro');
+      if(excess>0)issues.push('EXCESO: '+excess+' '+unit+' a cuarentena');
+      if(difference)issues.push('DIFERENCIA ALBARÁN/FÍSICO: '+alb+' / '+received+' '+unit);
+      if(q>0&&!mismatch&&!excess)issues.push('MATERIAL BLOQUEADO: '+q+' '+unit);
+      result.className='receipt-result'+(issues.length?' warning':'');
+      result.textContent='Disponible: '+accepted+' '+unit+' · Cuarentena: '+q+' '+unit+(hasOrder?' · Pendiente en pedido: '+pending+' '+unit:'');
+      if(note)note.textContent=issues.length?'INCIDENCIA AUTOMÁTICA · '+issues.join(' · '):hasOrder?'Referencia y cantidades compatibles con el pedido.':'';
+    }
     function updateReceiptSuggestions(){for(const line of document.querySelectorAll('#receiptLines .line')){fillLineZones(line);let hint=line.querySelector('.zone-suggestion'),proposal=proposeZone(line);hint.textContent=proposal?'Sugerencia ubicación conforme: '+proposal.name+' ('+proposal.reason+').':'Sin sugerencia fiable; se aplicará la zona conforme por defecto.';updateReceiptLine(line)}}
     function receiptZoneHintDisplay(){receiptZoneHint()}
     function proposeZone(line){let project=$('rProject').value,reference=value(line,'reference'),description=value(line,'description'),category=value(line,'category'),supplier=$('supplier').value.trim();
@@ -675,6 +720,9 @@
       order.lines.filter(l=>l.pending>0).forEach(l=>{
         addLine();const line=$('receiptLines').lastElementChild;
         line.dataset.siteLineId=l.lineId;
+        line.dataset.orderPending=String(l.pending);
+        line.querySelector('.order-reference-field').hidden=false;
+        line.querySelector('.order-reference').value=l.reference;
         line.querySelector('.reference').value=l.reference;
         line.querySelector('.description').value=l.description;
         const unit=line.querySelector('.unit');
@@ -684,13 +732,14 @@
         line.querySelector('.receivedQty').value=l.pending;
         updateReceiptLine(line);
       });
-      hint.textContent='Pedido '+(order.poNumber||order.requestId)+' · Introduce la cantidad realmente recibida en cada línea. Elimina las no recibidas; si recibes otros materiales, registra otra recepción libre.';
+      hint.textContent='Pedido '+(order.poNumber||order.requestId)+' · Introduce la cantidad realmente recibida en cada línea. Puedes corregir la referencia física, las cantidades y la cuarentena. Las diferencias generan incidencias. Para material no pedido, usa recepción libre.';
       updateReceiptSuggestions();
     }
     function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
       if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, zona conforme, proveedor y número de albarán o factura.');
       if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
-      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{let item=Object.fromEntries(['description','reference','manufacturer','unit','albaranQty','receivedQty','quarantineQty','incident','category'].map(k=>[k,value(line,k)]));
+      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{
+        updateReceiptLine(line);let item=Object.fromEntries(['description','reference','manufacturer','unit','albaranQty','receivedQty','quarantineQty','incident','category'].map(k=>[k,value(line,k)]));
         if(!item.reference||!item.description||!positive(item.albaranQty)||!nonNegative(item.receivedQty)||!nonNegative(item.quarantineQty))throw Error('Revisa referencia, descripción y cantidades de la línea '+(i+1)+'.');
         let received=Number(item.receivedQty),q=Number(item.quarantineQty);if(q>received)throw Error('La cuarentena supera lo recibido físicamente en la línea '+(i+1)+'.');
         item.acceptedQty=String(Math.round((received-q)*1000)/1000);item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
@@ -718,16 +767,24 @@
       if(!positive(quantity)||Number(quantity)>limit+1e-8)throw Error('Introduce una cantidad válida, sin superar '+limit+' '+material.unit+' disponibles para este movimiento.');
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     async function refresh(manual=false){const requestedWarehouse=state.currentWarehouse?.id,epoch=warehouseEpoch;if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];renderSiteOrderSelector();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderSummary();renderStock();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual)status('Datos actualizados.')}
       catch(e){if(manual)fail(e);else throw e}}
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
+    function renderReceiptIncidents(){
+      const box=$('receiptIncidentsSummary');if(!box)return;
+      const rows=(state.receiptIncidents||[]).filter(x=>x.ESTADO==='ABIERTA');
+      box.hidden=!rows.length;
+      if(!rows.length)return;
+      const items=rows.slice(0,12).map(x=>'<li><b>'+esc(x.INCIDENCIA_ID)+'</b> · '+esc(x.REFERENCIA_RECIBIDA||'')+' · '+esc(x.TIPO||'')+' · '+esc(x.ALBARAN||'')+'</li>').join('');
+      box.innerHTML='<strong>'+rows.length+' incidencia(s) abiertas en este almacén</strong><p>Material en cuarentena: resolver desde Cuarentena con autorización de Calidad. La incidencia documental permanecerá abierta hasta su conciliación administrativa.</p><ul>'+items+'</ul>';
+    }
     async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
       receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
       try{let result=await call('createReceipt',p);pendingReceipt='';let labels=expectedReceiptLabels(p,result.labels||[]);$('supplier').value='';$('document').value='';$('documentUrl').value='';$('imputationCode').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        $('siteOrder').value='';await refresh();renderSiteOrderBrowser();showReceiptLabels(labels);status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico.'));view('receipt',false)}
+        $('siteOrder').value='';await refresh();renderSiteOrderBrowser();showReceiptLabels(labels);renderReceiptIncidents();status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico · '+(result.incidents||0)+' incidencia(s) registradas.'));view('receipt',false)}
       catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
       finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}let x=physicalMaterials(p.origin).find(item=>item.materialId===p.lines[0].materialId);moveSaving=true;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Comprobando…';
@@ -783,6 +840,7 @@
         state.transferRequests=state.transferRequests||[];
         state.siteMaterialRequests=state.siteMaterialRequests||[];
         state.siteOrders=state.siteOrders||[];
+        state.receiptIncidents=state.receiptIncidents||[];
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
