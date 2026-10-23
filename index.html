@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14273b">
-  <title>LEVITEC Warehouse · TEST</title>
+  <title>LEVITEC Warehouse · Producción</title>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#14273b;background:#f4f6f8;font-synthesis:none}
     *{box-sizing:border-box}
@@ -170,7 +170,6 @@
   </style>
 </head>
 <body>
-  <div style="background:#8b261f;color:white;text-align:center;padding:10px;font-weight:800;letter-spacing:.06em;position:sticky;top:0;z-index:100">ENTORNO DE PRUEBAS · DATOS NO REALES · WAREHOUSE v1.18 TEST</div>
   <header class="topbar"><div class="topbar-inner">
     <div class="brand"><div class="brand-mark" aria-hidden="true">L</div><div><small>LEVITEC · SITE CONTROL</small><strong>Warehouse</strong></div></div>
     <div id="identity" class="identity" hidden>
@@ -1215,7 +1214,7 @@
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
-        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.16-test';
+        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.20-rc2-prod';
 
         $('login').hidden=true;
         $('app').hidden=false;
@@ -1242,7 +1241,7 @@
         view('stock',false);
 
         if(!state.apiVersion||backendMismatch){
-          status('Backend no sincronizado con LEVITEC Warehouse. Vuelve a desplegar Warehouse_Code.gs.','info');
+          status('La versión del backend no coincide con la de Warehouse Producción. Verifica la implementación de Apps Script.','info');
         }
       }catch(e){
         $('app').hidden=true;
