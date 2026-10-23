@@ -369,6 +369,22 @@
     const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
     const SCRIPT_URL='https://script.google.com/macros/s/AKfycbx86icSTjNwO65y20Lvwf-rDMUAfPbb1s_Ct7YIa9W2DPgeKl5ByOMGZYXvq2TGQ74/exec';
     let warehouseEpoch=0,warehouseSwitching=false,zoneSaving=false;
+    const deepLinkParams=new URLSearchParams(window.location.search);
+    let pendingDeepLinkOrder=deepLinkParams.get('view')==='receipt' ? deepLinkParams.get('orderId') : null;
+    function applyReceiptDeepLink(){
+      if(!pendingDeepLinkOrder)return;
+      const orderId=pendingDeepLinkOrder;
+      view('receipt',false);
+      const box=$('orderSearch');if(box)box.value=orderId;
+      renderSiteOrderBrowser();
+      if((state.siteOrders||[]).some(o=>o.requestId===orderId)){
+        pendingDeepLinkOrder=null;
+        chooseSiteOrder(orderId);
+        status('Pedido abierto desde Site Control. Comprueba almacén y albarán antes de registrar.','info');
+      }else{
+        status('El pedido '+orderId+' no figura entre los pendientes de este almacén. Selecciona la nave de destino y pulsa Actualizar.','info');
+      }
+    }
     let credential='',state={},pendingReceipt='',pendingMove='',pendingRelease='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='',qrScannerInstance=null,lastReceiptLabels=[],scannedMaterialRef='';
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -862,31 +878,36 @@
         const unit=line.querySelector('.unit');
         if(![...unit.options].some(o=>o.value===l.unit))unit.add(new Option(l.unit,l.unit));
         unit.value=l.unit;
-        line.querySelector('.albaranQty').value=l.pending;
-        line.querySelector('.receivedQty').value=l.pending;
+        line.querySelector('.albaranQty').value='';
+        line.querySelector('.receivedQty').value='';
         updateReceiptLine(line);
       });
-      hint.textContent='Pedido '+(order.poNumber||order.requestId)+' · Introduce la cantidad realmente recibida en cada línea. Puedes corregir la referencia física, las cantidades y la cuarentena. Las diferencias generan incidencias. Para material no pedido, usa recepción libre.';
+      hint.textContent='Pedido '+(order.poNumber||order.requestId)+' · Solo completa las líneas que figuran en el albarán actual. Deja ambas cantidades vacías en las no incluidas: seguirán pendientes sin incidencia. Las discrepancias entre albarán y físico sí generan incidencia.';
       updateReceiptSuggestions();
     }
     function receiptData(){let supplier=$('supplier').value.trim(),doc=$('document').value.trim(),url=$('documentUrl').value.trim();
       if(!$('rProject').value||!$('rZone').value||!supplier||!doc)throw Error('Completa proyecto, zona conforme, proveedor y número de albarán o factura.');
       if(url&&!url.startsWith('https://'))throw Error('El enlace del documento debe empezar por https://');
-      let lines=[...document.querySelectorAll('#receiptLines .line')].map((line,i)=>{
+      const orderId=$('siteOrder').value;
+      const sourceLines=[...document.querySelectorAll('#receiptLines .line')].filter(line=>{
+        if(!orderId)return true;
+        return value(line,'albaranQty')!=='' || value(line,'receivedQty')!=='';
+      });
+      if(orderId && !sourceLines.length)throw Error('Ninguna línea está incluida en este albarán. No se puede registrar una recepción vacía.');
+      let lines=sourceLines.map((line,i)=>{
         updateReceiptLine(line);let item=Object.fromEntries(['description','reference','manufacturer','unit','albaranQty','receivedQty','quarantineQty','incident','category'].map(k=>[k,value(line,k)]));
         if(!item.reference||!item.description||!positive(item.albaranQty)||!nonNegative(item.receivedQty)||!nonNegative(item.quarantineQty))throw Error('Revisa referencia, descripción y cantidades de la línea '+(i+1)+'.');
         let received=Number(item.receivedQty),q=Number(item.quarantineQty);if(q>received)throw Error('La cuarentena supera lo recibido físicamente en la línea '+(i+1)+'.');
         item.acceptedQty=String(Math.round((received-q)*1000)/1000);item.zone=line.querySelector('.line-zone')?.value||$('rZone').value;
         item.quarantineZone=line.querySelector('.quarantine-zone')?.value||'';item.quarantineReason=line.querySelector('.quarantine-reason')?.value||'';
         if(q>0&&(!item.quarantineZone||!item.quarantineReason))throw Error('Selecciona zona y motivo de cuarentena en la línea '+(i+1)+'.');return item});
-      const orderId=$('siteOrder').value;
       if(orderId){
         const order=(state.siteOrders||[]).find(o=>o.requestId===orderId);
         if(!order)throw Error('El pedido ya no está disponible. Actualiza el almacén.');
         if(order.projectId!==$('rProject').value)throw Error('El proyecto no coincide con el pedido.');
         const linked=new Set();
         lines.forEach((l,i)=>{
-          const lineId=document.querySelectorAll('#receiptLines .line')[i].dataset.siteLineId;
+          const lineId=sourceLines[i].dataset.siteLineId;
           if(!lineId||linked.has(lineId))throw Error('Revisa las líneas del pedido seleccionado.');
           linked.add(lineId);l.siteLineId=lineId;
         });
@@ -902,7 +923,7 @@
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     let v118RefreshSerial=0;
     async function refresh(manual=false){const requestedWarehouse=state.currentWarehouse?.id,epoch=warehouseEpoch,requestSerial=++v118RefreshSerial;if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;if($('stockScope')?.value==='GLOBAL')loadStockScope();state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;if($('stockScope')?.value==='GLOBAL')loadStockScope();state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();if(pendingDeepLinkOrder)applyReceiptDeepLink();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderSummary();renderStock();renderLogistics();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual){await logisticsChoices();status('Datos y buscador actualizados.')}}
@@ -1239,6 +1260,7 @@
         addLine();
         await refresh();
         view('stock',false);
+        applyReceiptDeepLink();
 
         if(!state.apiVersion||backendMismatch){
           status('La versión del backend no coincide con la de Warehouse Producción. Verifica la implementación de Apps Script.','info');
@@ -1336,7 +1358,15 @@
         renderWarehouseSelector();
       }finally{warehouseSwitching=false}
     }
-    function initGoogle(){google.accounts.id.initialize({client_id:CLIENT_ID,callback:signedIn,ux_mode:'popup'});google.accounts.id.renderButton($('signin'),{theme:'outline',size:'large',text:'signin_with',width:250})}
+    function initGoogle(){
+      google.accounts.id.initialize({client_id:CLIENT_ID,callback:signedIn,ux_mode:'popup',auto_select:false});
+      google.accounts.id.renderButton($('signin'),{theme:'outline',size:'large',text:'signin_with',width:250});
+      // Intento sin interacción solamente al acceder a un pedido desde Site Control.
+      // GIS puede rechazarlo (consentimiento, cookies, navegador); nunca se omite auth_ del backend.
+      if(pendingDeepLinkOrder){
+        try{google.accounts.id.prompt();}catch(e){console.warn('Google silent sign-in unavailable',e);}
+      }
+    }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
