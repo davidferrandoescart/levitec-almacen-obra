@@ -371,19 +371,46 @@
     let warehouseEpoch=0,warehouseSwitching=false,zoneSaving=false;
     const deepLinkParams=new URLSearchParams(window.location.search);
     let pendingDeepLinkOrder=deepLinkParams.get('view')==='receipt' ? deepLinkParams.get('orderId') : null;
+    let deepLinkLocating=false;
     function applyReceiptDeepLink(){
-      if(!pendingDeepLinkOrder)return;
+      if(!pendingDeepLinkOrder)return false;
       const orderId=pendingDeepLinkOrder;
+      if(!state.canReceive){
+        status('Tu usuario tiene acceso de consulta, pero no autorización para registrar recepciones en Warehouse.','info');
+        return false;
+      }
       view('receipt',false);
       const box=$('orderSearch');if(box)box.value=orderId;
+      if($('orderProjectFilter') && deepLinkParams.get('projectId'))$('orderProjectFilter').value=deepLinkParams.get('projectId');
       renderSiteOrderBrowser();
-      if((state.siteOrders||[]).some(o=>o.requestId===orderId)){
+      const available=(state.siteOrders||[]).find(o=>o.requestId===orderId);
+      if(available && available.receiptStatus!=='COMPLETA' && (available.lines||[]).some(l=>Number(l.pending)>0)){
         pendingDeepLinkOrder=null;
         chooseSiteOrder(orderId);
-        status('Pedido abierto desde Site Control. Comprueba almacén y albarán antes de registrar.','info');
-      }else{
-        status('El pedido '+orderId+' no figura entre los pendientes de este almacén. Selecciona la nave de destino y pulsa Actualizar.','info');
+        status('Pedido abierto desde Site Control en '+(state.currentWarehouse?.name||'este almacén')+'. Comprueba el albarán antes de guardar.','info');
+        return true;
       }
+      return false;
+    }
+    async function locateDeepLinkWarehouse(){
+      if(!pendingDeepLinkOrder||deepLinkLocating||!state.canReceive)return;
+      deepLinkLocating=true;
+      try{
+        if(applyReceiptDeepLink())return;
+        const original=state.currentWarehouse?.id;
+        const candidates=(state.warehouses||[]).map(x=>x.id).filter(id=>id&&id!==original);
+        const explicit=deepLinkParams.get('warehouseId');
+        if(explicit&&candidates.includes(explicit))candidates.splice(candidates.indexOf(explicit),1),candidates.unshift(explicit);
+        for(const id of candidates){
+          $('warehouseSelector').value=id;
+          await changeWarehouse();
+          if(applyReceiptDeepLink())return;
+        }
+        view('receipt',false);
+        const box=$('orderSearch');if(box)box.value=pendingDeepLinkOrder;
+        renderSiteOrderBrowser();
+        status('No se ha encontrado el pedido pendiente '+pendingDeepLinkOrder+' en tus almacenes autorizados. Puede estar completamente recepcionado o pendiente de sincronización.','info');
+      }finally{deepLinkLocating=false;}
     }
     let credential='',state={},pendingReceipt='',pendingMove='',pendingRelease='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='',qrScannerInstance=null,lastReceiptLabels=[],scannedMaterialRef='';
     const $=id=>document.getElementById(id);
@@ -923,7 +950,7 @@
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     let v118RefreshSerial=0;
     async function refresh(manual=false){const requestedWarehouse=state.currentWarehouse?.id,epoch=warehouseEpoch,requestSerial=++v118RefreshSerial;if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;if($('stockScope')?.value==='GLOBAL')loadStockScope();state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();if(pendingDeepLinkOrder)applyReceiptDeepLink();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;if($('stockScope')?.value==='GLOBAL')loadStockScope();state.movements=r.movements;state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         renderSummary();renderStock();renderLogistics();renderMoves();renderTransfers();renderMap();renderQuality();available();applyProjectRule();updateReceiptSuggestions();if(manual){await logisticsChoices();status('Datos y buscador actualizados.')}}
@@ -1260,7 +1287,7 @@
         addLine();
         await refresh();
         view('stock',false);
-        applyReceiptDeepLink();
+        await locateDeepLinkWarehouse();
 
         if(!state.apiVersion||backendMismatch){
           status('La versión del backend no coincide con la de Warehouse Producción. Verifica la implementación de Apps Script.','info');
