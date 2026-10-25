@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14273b">
+  <meta name="levitec-frontend-release" content="rc8-20261025">
   <title>LEVITEC Warehouse · Producción</title>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#14273b;background:#f4f6f8;font-synthesis:none}
@@ -385,31 +386,21 @@
       renderSiteOrderBrowser();
       const available=(state.siteOrders||[]).find(o=>o.requestId===orderId);
       if(available && available.receiptStatus!=='COMPLETA' && (available.lines||[]).some(l=>Number(l.pending)>0)){
-        pendingDeepLinkOrder=null;
         chooseSiteOrder(orderId);
+        if($('siteOrder').value!==orderId)return false;
+        pendingDeepLinkOrder=null;
         status('Pedido abierto desde Site Control en '+(state.currentWarehouse?.name||'este almacén')+'. Comprueba el albarán antes de guardar.','info');
         return true;
       }
       return false;
     }
     async function locateDeepLinkWarehouse(){
-      if(!pendingDeepLinkOrder||deepLinkLocating||!state.canReceive)return;
+      if(!pendingDeepLinkOrder||deepLinkLocating)return;
+      if(!state.canReceive){status('Tu usuario no tiene permiso para registrar recepciones en este almacén.','info');return;}
       deepLinkLocating=true;
       try{
         if(applyReceiptDeepLink())return;
-        const original=state.currentWarehouse?.id;
-        const candidates=(state.warehouses||[]).map(x=>x.id).filter(id=>id&&id!==original);
-        const explicit=deepLinkParams.get('warehouseId');
-        if(explicit&&candidates.includes(explicit))candidates.splice(candidates.indexOf(explicit),1),candidates.unshift(explicit);
-        for(const id of candidates){
-          $('warehouseSelector').value=id;
-          await changeWarehouse();
-          if(applyReceiptDeepLink())return;
-        }
-        view('receipt',false);
-        const box=$('orderSearch');if(box)box.value=pendingDeepLinkOrder;
-        renderSiteOrderBrowser();
-        status('No se ha encontrado el pedido pendiente '+pendingDeepLinkOrder+' en tus almacenes autorizados. Puede estar completamente recepcionado o pendiente de sincronización.','info');
+        status('Nueva recepción abierta. El pedido '+pendingDeepLinkOrder+' no está pendiente en este almacén. Selecciona su almacén en la cabecera; también puede estar completado o pendiente de sincronización.','info');
       }finally{deepLinkLocating=false;}
     }
     let credential='',state={},pendingReceipt='',pendingMove='',pendingRelease='',receiptSaving=false,moveSaving=false,actionBusy=false,activeView='stock',lastVisibleStock=[],drawing=false,draftPoints=[],draftDirty=false,geometryDirty=false,editorZoneCode='',qrScannerInstance=null,lastReceiptLabels=[],scannedMaterialRef='';
@@ -437,7 +428,7 @@
     function setChoices(id,items,key,label,placeholder){let el=$(id),previous=el.value;el.replaceChildren();if(placeholder){let option=new Option(placeholder,'');el.add(option)}
       items.filter(item=>!(item.AREA==='NO_ALMACENABLE'&&id!=='zonePick')).forEach(item=>el.add(new Option(key==='CODIGO'&&id!=='zonePick'?zoneLabel(item[key]):(item[label]||item[key]),item[key])));if([...el.options].some(o=>o.value===previous))el.value=previous}
     const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Recepciones pendientes y solicitudes de uso de stock protegido.'],transfers:['Traspasos','Consumos cruzados y saldos pendientes de compensar entre proyectos.'],logistics:['Operaciones de material','Movimientos internos, traslados y consumos a obra con identificación QR y múltiples referencias.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
-    function view(id,load=true){if(!pages[id]||(!['ADMIN','ALMACEN'].includes(state.user?.role)&&['receipt','transfer'].includes(id)))return;
+    function view(id,load=true){if(!pages[id]||(id==='receipt'&&!state.canReceive)||(id==='transfer'&&!['ADMIN','ALMACEN'].includes(state.user?.role)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
       $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(load&&id==='moves'&&!Array.isArray(state.movements))refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
     const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1248,7 +1239,8 @@
       $('loginError').hidden=true;
 
       try{
-        state=await call('bootstrap');
+        const initialWarehouse=deepLinkParams.get('warehouseId');
+        state=await call('bootstrap',initialWarehouse?{warehouseId:initialWarehouse}:{});
 
         state.projectRules=state.projectRules||[];
         state.transfers=state.transfers||[];
@@ -1285,8 +1277,9 @@
 
         hydrateWarehouseControls();
         addLine();
+        // Conserva la lectura de stock del flujo instalado hasta verificar el backend real.
         await refresh();
-        view('stock',false);
+        view(pendingDeepLinkOrder&&state.canReceive?'receipt':'stock',false);
         await locateDeepLinkWarehouse();
 
         if(!state.apiVersion||backendMismatch){
@@ -1378,8 +1371,10 @@
         applyProjectRule();
         updateReceiptSuggestions();
 
+        renderSiteOrderSelector();renderReceiptIncidents();
         status('Almacén cambiado a '+(state.currentWarehouse.name||state.currentWarehouse.id)+'.');
-        view('stock',false);
+        view(pendingDeepLinkOrder&&state.canReceive?'receipt':'stock',false);
+        await locateDeepLinkWarehouse();
       }catch(e){
         fail(e);
         renderWarehouseSelector();
