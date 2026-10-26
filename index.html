@@ -172,6 +172,11 @@
 /* RC12: filas de inventario y selección de unidades */
 #stockRows td{padding:10px 12px;vertical-align:middle;font-size:12px}#stockRows .stock-ref{white-space:nowrap;color:#123750}#stockRows .stock-description{max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6a7c8d;font-weight:400}.stock-position{display:block;line-height:1.6;white-space:nowrap;font-size:11px}.reserved-note{display:block;font-size:10px;font-weight:400;color:#9b641b;white-space:nowrap}.material-choice{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:11px 13px;margin:5px 0;border:1px solid #d6e2e7;border-radius:9px;background:#fff;text-align:left;cursor:pointer;color:#173247}.material-choice.selected{border:2px solid #168b8d;background:#f1fafa}.material-choice:disabled{background:#f5f7f9;color:#81909e;cursor:not-allowed}.material-choice-text{display:grid;gap:3px;min-width:0}.material-choice-text>b{font-size:13px}.material-choice-text>span{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6c7d8c}.material-choice-text>small{font-size:10px;color:#718292}.material-choice-qty{font-size:17px;font-weight:800;white-space:nowrap}.material-choice-qty small{display:block;font-size:10px;font-weight:400}#lQty{font-size:20px;font-weight:700;min-height:48px}.operation-check{padding:10px 12px;background:#eef7f8;border-radius:8px;font-size:12px;overflow-wrap:anywhere}.operation-check span{font-size:10px;color:#647c8d}.operation-check button{margin:4px 0 4px 8px}#logisticsList .line h3{overflow-wrap:anywhere;font-size:13px}@media(max-width:600px){.material-choice-text>span{max-width:230px}.stock-position{white-space:normal}}
 
+
+/* RC13: referencia desplegable y cola de etiquetas */
+#receiptLabels:not([hidden]){display:block}
+.stock-disclosure{display:inline-flex;gap:6px;align-items:center;border:0;padding:3px 0;background:none;color:#163950;font:inherit;font-weight:750;cursor:pointer;text-align:left;white-space:nowrap}.stock-disclosure>span{color:#0c969b;min-width:10px}.stock-disclosure:focus-visible{outline:2px solid #0c969b;outline-offset:3px}.stock-breakdown>td{padding:0 16px 14px!important;background:#f5fafb}.stock-breakdown table{width:100%;background:#fff;border:1px solid #deeaed;border-radius:6px;font-size:11px}.stock-breakdown th,.stock-breakdown td{padding:9px 12px!important}.stock-breakdown th{background:#eef5f6}.stock-zone-summary{font-size:10px!important;max-width:280px;overflow-wrap:anywhere}.print-queue-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}.print-queue-heading strong{font-size:16px}.print-queue-heading p{font-size:12px;color:#627c8d;margin:5px 0 12px}.print-queue-heading>span{background:#e4f2f2;padding:6px 10px;border-radius:20px;white-space:nowrap;font-size:12px}.print-queue-list{max-height:260px;overflow:auto;border-top:1px solid #e1eaed;border-bottom:1px solid #e1eaed;margin-bottom:12px}.print-queue-item{display:flex;gap:10px;align-items:center;padding:8px 2px;font-size:12px;border-bottom:1px solid #eef2f4}.print-queue-item:last-child{border-bottom:0}.print-queue-item input{width:17px;height:17px;accent-color:#0b9498}.print-queue-item small{display:block;font-size:10px;color:#718494;margin-top:3px}
+
 </style>
 </head>
 <body>
@@ -210,7 +215,7 @@
       <div class="card panel">
         <div class="panel-top"><div><h2>Existencias</h2><p>Busca y filtra para localizar material rápidamente.</p></div></div>
         <div class="tools">
-          <label class="field"><span>Ámbito</span><select id="stockScope" onchange="loadStockScope()"><option value="LOCAL">Almacén seleccionado</option><option value="GLOBAL">Todos los almacenes autorizados</option></select></label><label class="field"><span>Vista</span><select id="stockView" onchange="renderStock()"><option value="DETAIL">Una línea por ubicación</option><option value="GROUP">Agrupada por referencia</option></select></label><label class="field search"><span>Buscar material</span><input id="search" type="search" placeholder="Descripción, referencia o zona…" oninput="renderStock()"></label>
+          <label class="field"><span>Ámbito</span><select id="stockScope" onchange="loadStockScope()"><option value="LOCAL">Almacén seleccionado</option><option value="GLOBAL">Todos los almacenes autorizados</option></select></label><label class="field"><span>Vista</span><select id="stockView" onchange="renderStock()"><option value="GROUP">Una referencia · desplegar ubicaciones</option><option value="DETAIL">Una línea por ubicación</option></select></label><label class="field search"><span>Buscar material</span><input id="search" type="search" placeholder="Descripción, referencia o zona…" oninput="renderStock()"></label>
           <label class="field filter"><span>Proyecto</span><select id="stockProject" onchange="renderStock()"><option value="">Todos</option></select></label>
           <label class="field filter"><span>Ubicación</span><select id="stockZone" onchange="renderStock()"><option value="">Todas</option></select></label>
           <button type="button" class="button secondary" onclick="exportStock()">↓ &nbsp;Exportar CSV</button>
@@ -469,18 +474,30 @@
       }
       renderStock();
     }
+    const expandedStockRC13=new Set();
+    function stockPositionRC13(x){
+      const wid=x.warehouseId||state.currentWarehouse?.id||'',zone=(state.zones||[]).find(z=>z.CODIGO===x.zone&&(!z.ALMACEN_ID||z.ALMACEN_ID===wid));
+      return {warehouse:wid,code:x.zone,name:zone?.NOMBRE||x.zoneName||zoneLabel(x.zone)};
+    }
+    function stockReservedRC13(x){
+      return Number((state.availableStockRC12||[]).find(r=>r.warehouseId===x.warehouseId&&r.project===x.project&&r.zone===x.zone&&r.materialId===x.materialId)?.reservedQuantity||0);
+    }
+    function toggleStockRC13(key){expandedStockRC13.has(key)?expandedStockRC13.delete(key):expandedStockRC13.add(key);renderStock();}
     function renderStock(){
       const rows=filteredStock();lastVisibleStock=rows;$('stockEmpty').hidden=rows.length>0;
-      let groups=[];
-      if($('stockView')?.value==='GROUP'){
-        const map=new Map();rows.forEach(x=>{const key=(x.materialId||x.reference)+'|'+x.unit;if(!map.has(key))map.set(key,{...x,positions:[],quantity:0});const g=map.get(key);g.positions.push(x);g.quantity+=Number(x.quantity);});groups=[...map.values()];
-      }else groups=rows.map(x=>({...x,positions:[x]}));
-      $('stockCount').textContent=new Set(rows.map(x=>x.materialId||x.reference)).size+' referencias · '+rows.length+' ubicaciones';
-      $('stockRows').innerHTML=groups.map(g=>{
-        const positions=g.positions.map(x=>{const wid=x.warehouseId||state.currentWarehouse?.id||'',zone=(state.zones||[]).find(z=>z.CODIGO===x.zone&&(!z.ALMACEN_ID||z.ALMACEN_ID===wid));const name=zone?.NOMBRE||x.zoneName||zoneLabel(x.zone);return '<span class="stock-position">'+esc(wid)+' / <b>'+esc(x.zone)+'</b>'+(name!==x.zone?' · '+esc(name):'')+(g.positions.length>1?' · '+esc(x.quantity)+' '+esc(x.unit):'')+'</span>';}).join('');
-        const owners=[...new Set(g.positions.map(x=>x.project))].join(', ');
-        const reserved=g.positions.reduce((sum,x)=>{const r=(state.availableStockRC12||[]).find(r=>r.warehouseId===x.warehouseId&&r.project===x.project&&r.zone===x.zone&&r.materialId===x.materialId);return sum+Number(r?.reservedQuantity||0);},0);
-        return '<tr><td class="stock-ref"><strong>'+esc(g.reference||'Sin referencia')+'</strong></td><td class="stock-description" title="'+esc(g.description)+'">'+esc(g.description)+'</td><td>'+esc(owners)+'</td><td>'+positions+'</td><td class="right"><strong>'+esc(Math.round(g.quantity*1000)/1000)+' '+esc(g.unit)+'</strong>'+(reserved?'<small class="reserved-note">Libre '+esc(Math.max(0,g.quantity-reserved))+' · reservado '+esc(reserved)+'</small>':'')+'</td><td><button type="button" class="button secondary small" onclick="printStockLabelById('+JSON.stringify(String(g.materialId||g.reference||'')).replace(/"/g,'&quot;')+')">Imprimir</button></td></tr>';
+      const grouped=$('stockView')?.value!=='DETAIL',map=new Map();
+      rows.forEach((x,i)=>{const key=(x.materialId||x.reference)+'|'+x.unit+(grouped?'':'|'+i);if(!map.has(key))map.set(key,{...x,key,positions:[],quantity:0});const g=map.get(key);g.positions.push(x);g.quantity+=Number(x.quantity);});
+      const positions=new Set(rows.map(x=>(x.warehouseId||state.currentWarehouse?.id)+'|'+x.zone));
+      $('stockCount').textContent=new Set(rows.map(x=>x.materialId||x.reference)).size+' referencias · '+positions.size+' ubicaciones · '+rows.length+' posiciones de proyecto';
+      $('stockRows').innerHTML=[...map.values()].map(g=>{
+        const key=JSON.stringify(g.key).replace(/"/g,'&quot;'),open=expandedStockRC13.has(g.key),owners=[...new Set(g.positions.map(x=>x.project))].join(', '),zones=[...new Set(g.positions.map(x=>{const p=stockPositionRC13(x);return p.warehouse+' / '+p.code;}))].join(' · ');
+        const reserved=g.positions.reduce((n,x)=>n+stockReservedRC13(x),0);
+        const print='<button type="button" class="button secondary small" onclick="printStockLabelById('+JSON.stringify(String(g.materialId||g.reference||'')).replace(/"/g,'&quot;')+')">Imprimir</button>';
+        const reference=grouped?'<button class="stock-disclosure" type="button" aria-expanded="'+open+'" onclick="toggleStockRC13('+key+')"><span aria-hidden="true">'+(open?'▾':'▸')+'</span> '+esc(g.reference||'Sin referencia')+'</button>':'<strong>'+esc(g.reference||'Sin referencia')+'</strong>';
+        const summary='<tr class="stock-summary"><td class="stock-ref">'+reference+'</td><td class="stock-description" title="'+esc(g.description)+'">'+esc(g.description)+'</td><td>'+esc(owners)+'</td><td class="stock-zone-summary">'+esc(zones)+'</td><td class="right"><strong>'+esc(Math.round(g.quantity*1000)/1000)+' '+esc(g.unit)+'</strong>'+(reserved?'<small class="reserved-note">Libre '+esc(Math.max(0,g.quantity-reserved))+' · reservado '+esc(reserved)+'</small>':'')+'</td><td>'+print+'</td></tr>';
+        if(!grouped||!open)return summary;
+        const detail=g.positions.map(x=>{const p=stockPositionRC13(x),held=stockReservedRC13(x);return '<tr><td>'+esc(x.project)+'</td><td>'+esc(p.warehouse)+'</td><td><b>'+esc(p.code)+'</b> · '+esc(p.name)+'</td><td class="right">'+esc(x.quantity)+' '+esc(x.unit)+'</td><td class="right">'+esc(Math.max(0,Number(x.quantity)-held))+' '+esc(x.unit)+(held?'<small class="reserved-note">Reservado '+esc(held)+'</small>':'')+'</td></tr>';}).join('');
+        return summary+'<tr class="stock-breakdown"><td colspan="6"><table aria-label="Ubicaciones de '+esc(g.reference)+'"><thead><tr><th>Proyecto</th><th>Almacén</th><th>Zona exacta</th><th class="right">Físico</th><th class="right">Libre</th></tr></thead><tbody>'+detail+'</tbody></table></td></tr>';
       }).join('');
     }
 
@@ -964,12 +981,46 @@
       const items=rows.slice(0,12).map(x=>'<li><b>'+esc(x.INCIDENCIA_ID)+'</b> · '+esc(x.REFERENCIA_RECIBIDA||'')+' · '+esc(x.TIPO||'')+' · '+esc(x.ALBARAN||'')+'</li>').join('');
       box.innerHTML='<strong>'+rows.length+' incidencia(s) abiertas en este almacén</strong><p>Material en cuarentena: resolver desde Cuarentena con autorización de Calidad. La incidencia documental permanecerá abierta hasta su conciliación administrativa.</p><ul>'+items+'</ul>';
     }
-    async function saveReceipt(){if(receiptSaving)return;let p;try{p=receiptData()}catch(e){fail(e);return}
-      receiptSaving=true;pendingReceipt=p.batchId;$('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
-      try{let result=await call('createReceipt',p);pendingReceipt='';let labels=expectedReceiptLabels(p,result.labels||[]);$('supplier').value='';$('document').value='';$('documentUrl').value='';$('imputationCode').value='';$('rNote').value='';$('receiptLines').replaceChildren();addLine();
-        $('siteOrder').value='';await refresh();renderSiteOrderBrowser();showReceiptLabels(labels);renderReceiptIncidents();status('Recepción '+result.batchId.slice(0,8)+(result.duplicate?' ya registrada.':' registrada · '+result.lines+' movimiento(s) · '+result.differences+' diferencia(s) albarán/físico · '+(result.incidents||0)+' incidencia(s) registradas.'));view('receipt',false)}
-      catch(e){fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error')}
-      finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción'}}
+    async function saveReceipt(){
+      if(receiptSaving)return;let p;try{p=receiptData();}catch(e){fail(e);return;}
+      receiptSaving=true;pendingReceipt=p.batchId;let recorded=null;
+      $('receiptSubmit').disabled=true;$('receiptSubmit').textContent='Guardando…';status('Registrando recepción…','info');
+      try{
+        recorded=await call('createReceipt',p);pendingReceipt='';
+        let labels=expectedReceiptLabels(p,recorded.labels||[]);
+        showReceiptLabels(labels,recorded.batchId);
+        for(const id of ['supplier','document','documentUrl','imputationCode','rNote'])$(id).value='';
+        $('receiptLines').replaceChildren();addLine();$('siteOrder').value='';
+        let warning='';
+        try{await refresh();labels=expectedReceiptLabels(p,recorded.labels||[]);showReceiptLabels(labels,recorded.batchId);}
+        catch(e){warning=' No se pudo actualizar la pantalla; la recepción está registrada. Usa Actualizar, sin volver a registrarla.';}
+        try{renderSiteOrderBrowser();renderReceiptIncidents();}catch(e){warning+=' Alguna lista no se ha actualizado.';}
+        if(labels.incompleteQuarantineRC13)warning+=' Falta recuperar alguna etiqueta de cuarentena; actualiza para recuperarla.';
+        status('Recepción '+recorded.batchId.slice(0,8)+(recorded.duplicate?' ya registrada.':' registrada.')+' Cola de impresión preparada.'+warning,warning?'info':'success');view('receipt',false);
+      }catch(e){
+        if(recorded)status('La recepción está registrada. No la repitas. La pantalla no pudo completarse: '+e.message,'info');
+        else{fail(e);if(/No hay respuesta/.test(e.message))status('No se confirmó la respuesta. Consulta Movimientos antes de volver a registrar esta recepción.','error');}
+      }finally{receiptSaving=false;$('receiptSubmit').disabled=false;$('receiptSubmit').textContent='Registrar recepción';}
+    }
+    function expectedReceiptLabels(payload,backendLabels){
+      const out=Array.isArray(backendLabels)?backendLabels.slice():[];
+      (payload.lines||[]).forEach(line=>{
+        const ref=normalizedReference(line.reference),material=(state.materials||[]).find(m=>normalizedReference(m.REFERENCIA)===ref)||{};
+        if(Number(line.acceptedQty)>0&&!out.some(x=>x.type==='MATERIAL'&&normalizedReference(x.reference)===ref))out.push({type:'MATERIAL',reference:ref,description:material.DESCRIPCION||line.description,unit:material.UNIDAD||line.unit,manufacturer:material.FABRICANTE||line.manufacturer});
+      });
+      // En un reintento, recuperar IDs reales; nunca inventar QR de lote/cuarentena.
+      const lots=(state.lots||[]).filter(l=>l.RECEPCION_ID===payload.batchId);
+      lots.forEach(l=>{if(!out.some(x=>x.type==='LOTE'&&x.lotId===l.ID_LOTE_MATERIAL))out.push({type:'LOTE',lotId:l.ID_LOTE_MATERIAL,reference:l.REFERENCIA,description:l.DESCRIPCION,unit:l.UNIDAD,quantity:l.CANTIDAD_INICIAL,project:l.PROYECTO_ORIGEN,zone:l.ZONA_INICIAL});});
+      (state.movements||[]).filter(e=>e.ID_LOTE===payload.batchId&&e.TIPO==='RECEPCION_CUARENTENA'&&e.ESTADO!=='ANULADO'&&e.MATERIAL_LOT_ID).forEach(e=>{
+        if(out.some(x=>x.type==='CUARENTENA'&&x.lotId===e.MATERIAL_LOT_ID&&x.zone===e.DESTINO))return;
+        const lot=lots.find(l=>l.ID_LOTE_MATERIAL===e.MATERIAL_LOT_ID),material=(state.materials||[]).find(m=>m.ID===e.MATERIAL_ID);
+        const reference=lot?.REFERENCIA||material?.REFERENCIA;if(!reference)return;
+        out.push({type:'CUARENTENA',lotId:e.MATERIAL_LOT_ID,reference,description:e.DESCRIPCION,unit:e.UNIDAD,quantity:e.CANTIDAD,project:e.PROYECTO,zone:e.DESTINO,reason:e.INCIDENCIA||'Pendiente de revisión'});
+      });
+      out.incompleteQuarantineRC13=(payload.lines||[]).some(line=>Number(line.quarantineQty)>0&&!out.some(l=>l.type==='CUARENTENA'&&normalizedReference(l.reference)===normalizedReference(line.reference)&&l.zone===line.quarantineZone));
+      return out;
+    }
+
     async function saveMove(){if(moveSaving)return;let p;try{p=moveData()}catch(e){fail(e);return}let x=physicalMaterials(p.origin).find(item=>item.materialId===p.lines[0].materialId);moveSaving=true;$('moveSubmit').disabled=true;$('moveSubmit').textContent='Comprobando…';
       try{let check=await call('checkMove',p);if(check.status==='REQUIRES_APPROVAL'){let details=(check.protectedRows||[]).map(r=>r.project+' · '+r.criticality+' · disponible '+r.available+' · protegido '+(r.available-r.safe)+(r.date?' · necesidad '+r.date:'')).join('\n');if(!confirm('Este movimiento consumiría stock protegido de otro proyecto.\n\n'+details+'\n\n¿Enviar solicitud de autorización?'))return;let req=await call('requestProtectedTransfer',p);pendingMove='';$('mQuantity').value='';$('mNote').value='';await afterSave('Solicitud '+req.requestId+' enviada para autorización.','notifications');return}
         if(!confirm('Mover '+p.lines[0].quantity+' '+x.unit+' de «'+x.description+'» desde '+p.origin+' hasta '+p.destination+' para '+p.project+'?'))return;pendingMove=p.batchId;$('moveSubmit').textContent='Guardando…';let result=await call('moveStock',p);pendingMove='';$('mQuantity').value='';$('mNote').value='';$('qrCode').value='';scannedMaterialRef='';await afterSave('Movimiento '+result.batchId.slice(0,8)+(result.duplicate?' ya registrado.':' registrado.')+(Number(result.projectTransfers)>0?' · '+result.projectTransfers+' traspaso(s) entre proyectos generado(s).':''),Number(result.projectTransfers)>0?'transfers':'moves')}
@@ -981,17 +1032,7 @@
       actionBusy=true;status('Anulando movimiento…','info');
       try{await call('cancelMove',{batchId});await afterSave('Movimiento '+batchId.slice(0,8)+' anulado.','moves')}catch(e){fail(e)}finally{actionBusy=false}}
     let policyBusy=false;async function savePolicy(){if(policyBusy||!['ADMIN','JEFE'].includes(state.user?.role))return;policyBusy=true;const button=document.querySelector('button[onclick="savePolicy()"]');if(button){button.disabled=true;button.textContent='Guardando…'}let materialId=$('policyMaterial').value,project=$('policyProject').value,criticality=$('policyCriticality').value,reserve=$('policyReserve').value||'0',needDate=$('policyDate').value;if(!materialId||!project){status('Selecciona material y proyecto.','error');return}try{await call('saveMaterialPolicy',{materialId,project,criticality,reserve,needDate});await refresh();status('Protección de stock guardada.')}catch(e){fail(e)}finally{policyBusy=false;if(button){button.disabled=false;button.textContent='Guardar protección'}}}
-    function expectedReceiptLabels(payload,backendLabels){
-      let out=Array.isArray(backendLabels)?backendLabels.slice():[],has=(type,ref)=>out.some(x=>x.type===type&&normalizedReference(x.reference)===normalizedReference(ref));
-      (payload.lines||[]).forEach((line,i)=>{
-        let ref=normalizedReference(line.reference),material=(state.materials||[]).find(m=>normalizedReference(m.REFERENCIA)===ref)||{},description=material.DESCRIPCION||line.description||'',unit=material.UNIDAD||line.unit||'ud',manufacturer=material.FABRICANTE||line.manufacturer||'';
-        if(Number(line.acceptedQty)>0&&!has('MATERIAL',ref))out.push({type:'MATERIAL',reference:ref,description,unit,manufacturer,materialId:material.ID||''});
-        if(Number(line.quarantineQty)>0&&!out.some(x=>x.type==='CUARENTENA'&&normalizedReference(x.reference)===ref&&String(x.zone||'')===String(line.quarantineZone||''))){
-          out.push({type:'CUARENTENA',lotId:'Q-'+String(payload.batchId||'').slice(-8)+'-'+(i+1),reference:ref,description,unit,manufacturer,quantity:Number(line.quarantineQty),project:payload.project,zone:line.quarantineZone,reason:line.quarantineReason||line.incident||'Pendiente de revisión',supplier:payload.supplier,document:payload.document});
-        }
-      });
-      return out;
-    }
+
     function materialQrSummaryLocally(code){
       let reference=normalizedReference(String(code||'').replace(/^CELLARIQ:MAT:/i,'')),matches=(state.materials||[]).filter(m=>normalizedReference(m.REFERENCIA)===reference);
       if(matches.length!==1)throw Error(matches.length?'La referencia está duplicada en el catálogo.':'QR / referencia no reconocida.');
@@ -1008,16 +1049,25 @@
       printLabels([{type:'MATERIAL',reference,description:String(row.description||''),manufacturer:String(row.manufacturer||'')}]);
     }
 
-    function showReceiptLabels(labels){showReceiptLabelsRC11(labels);}
+    function showReceiptLabels(labels,batchId){showReceiptLabelsRC11(labels,batchId);}
 
     function printSelectedReceiptLabelsRC11(){
       const selected=[...document.querySelectorAll('#receiptLabels input[data-label-index]:checked')].map(x=>lastReceiptLabels[Number(x.dataset.labelIndex)]).filter(Boolean);
       printLabels(selected);
     }
-    function showReceiptLabelsRC11(labels){
-      lastReceiptLabels=labels||[];const box=$('receiptLabels');box.hidden=!lastReceiptLabels.length;if(box.hidden)return;
-      box.innerHTML='<strong>Selecciona las etiquetas que quieres imprimir</strong><p>Una etiqueta por selección. Las de referencia conservan CELLARIQ:MAT:. Lote y cuarentena se eligen aparte.</p>'+lastReceiptLabels.map((l,i)=>'<label style="display:block;margin:8px 0"><input type="checkbox" data-label-index="'+i+'" '+(l.type==='MATERIAL'?'checked':'')+'> '+esc(l.type)+' · '+esc(l.reference)+' '+esc(l.lotId||'')+'</label>').join('')+'<button type="button" class="button secondary" onclick="printSelectedReceiptLabelsRC11()">Vista previa / imprimir seleccionadas</button>';
+    function showReceiptLabelsRC11(labels,batchId='manual'){
+      document.querySelectorAll('#receiptLabels input[data-label-index]').forEach(input=>{const label=lastReceiptLabels[Number(input.dataset.labelIndex)];if(label)label._selectedRC13=input.checked;});
+      const keys=new Set(lastReceiptLabels.map(l=>l._queueKeyRC13));
+      (labels||[]).forEach(l=>{const key=[batchId,l.type,l.reference,l.lotId||'',l.zone||''].join('|');if(keys.has(key))return;keys.add(key);lastReceiptLabels.push({...l,_queueKeyRC13:key,_selectedRC13:l.type!=='LOTE'});});
+      renderPrintQueueRC13();
     }
+    function renderPrintQueueRC13(){
+      const box=$('receiptLabels');box.hidden=!lastReceiptLabels.length;if(box.hidden)return;
+      const selected=lastReceiptLabels.filter(l=>l._selectedRC13).length;
+      box.innerHTML='<div class="print-queue-heading"><div><strong>Cola de impresión</strong><p>Todas las seleccionadas salen juntas, una etiqueta por página.</p></div><span>'+selected+' etiqueta(s)</span></div><div class="print-queue-list">'+lastReceiptLabels.map((l,i)=>'<label class="print-queue-item"><input type="checkbox" data-label-index="'+i+'" '+(l._selectedRC13?'checked':'')+'><span><b>'+esc(l.reference)+'</b><small>'+esc(l.type==='MATERIAL'?'QR de material':l.type==='CUARENTENA'?'Cuarentena':'Lote opcional')+(l.lotId?' · '+esc(l.lotId):'')+'</small></span></label>').join('')+'</div><div class="actions"><button type="button" class="button" id="printQueueSubmitRC13" '+(!selected?'disabled':'')+' onclick="printSelectedReceiptLabelsRC11()">Imprimir cola ('+selected+')</button><button type="button" class="button secondary" onclick="clearPrintQueueRC13()">Vaciar cola</button></div>';
+      box.querySelectorAll('input[data-label-index]').forEach(input=>input.onchange=()=>{lastReceiptLabels[Number(input.dataset.labelIndex)]._selectedRC13=input.checked;renderPrintQueueRC13();});
+    }
+    function clearPrintQueueRC13(){lastReceiptLabels=[];renderPrintQueueRC13();}
 
     function printLabels(labels){
       if(!Array.isArray(labels)||!labels.length){status('No hay etiquetas para imprimir.','error');return}
