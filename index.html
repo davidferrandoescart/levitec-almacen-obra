@@ -327,14 +327,14 @@
         <label class="field"><span>Filtrar por zona (opcional)</span><select id="lOriginZone" onchange="logisticsMaterialChoices()"></select></label>
         <label class="field"><span>Zona destino</span><select id="lDestinationZone"></select></label>
         <label class="field"><span>Buscar material</span><input id="lSearch" type="search" oninput="logisticsMaterialChoices()" placeholder="Buscar referencia, descripción, proveedor, diámetro, zona…"></label><div class="field" style="grid-column:1/-1"><span>Material disponible · Selecciona una posición de stock</span><div id="lMaterialResults" style="max-height:350px;overflow:auto"></div><select id="lMaterial" hidden aria-label="Material seleccionado"></select></div>
-        <div class="field" style="grid-column:1/-1"><span>Identificación QR (opcional)</span><div style="display:flex;gap:8px;flex-wrap:wrap"><input style="flex:1;min-width:190px" id="lQr" placeholder="Escanea o introduce el QR" oninput="validateLogisticsQr()"><button type="button" class="button secondary" onclick="scanQr(true)">▣ Escanear QR</button><button type="button" class="button secondary" onclick="validateLogisticsQr()">Verificar</button></div><small id="lQrStatus">Puedes continuar sin QR; si lo utilizas, comprueba su referencia.</small></div><label class="field"><span>Cantidad</span><input id="lQty" type="number" step="0.001" min="0.001" placeholder="0" oninput="validateLogisticsQuantity()"><small id="lQtyStatus" aria-live="polite">Selecciona un material para consultar su disponibilidad.</small></label>
+        <div class="field" style="grid-column:1/-1"><span>Identificación QR (opcional)</span><div style="display:flex;gap:8px;flex-wrap:wrap"><input style="flex:1;min-width:190px" id="lQr" placeholder="Escanea o introduce el QR" oninput="validateLogisticsQr()"><button type="button" class="button secondary" onclick="scanQr(true)">▣ Escanear QR</button><button type="button" class="button secondary" onclick="validateLogisticsQr()">Verificar</button></div><small id="lQrStatus">Puedes continuar sin QR; si lo utilizas, comprueba su referencia.</small></div><label class="field"><span>Lote físico (opcional)</span><input id="lLotRC11" placeholder="Identificador exacto de etiqueta LOTE"><small>Indícalo solo si has identificado el lote físico. Se validan su material, origen y disponibilidad.</small></label><label class="field"><span>Cantidad</span><input id="lQty" type="number" step="0.001" min="0.001" placeholder="0" oninput="validateLogisticsQuantity()"><small id="lQtyStatus" aria-live="polite">Selecciona un material para consultar su disponibilidad.</small></label>
         <label class="field"><span>Observaciones</span><input id="lNote" maxlength="250" placeholder="Motivo / zona de entrega"></label>
       </div>
       <div class="form-footer"><button type="button" class="button secondary" id="lAdd" onclick="addLogisticsLine()">+ Añadir material a la operación</button></div>
       <div class="notice spacer">Puedes añadir varias referencias, cantidades, propietarios y zonas en una única operación. El QR es opcional. Los traslados entre almacenes conservan siempre el propietario. Las salidas confirmadas a OBRA consumen inmediatamente y solo generan compensación si el material pertenece a otro proyecto (excepto ANTIGUO). Elige una referencia y cantidad y pulsa «Añadir material». Puedes incluir distintas referencias y zonas de origen en una misma operación. La autorización solo se solicitará para referencias críticas o bloqueadas.</div>
       <div id="logisticsCart" class="spacer"></div>
       <div class="form-footer"><button id="lSubmit" type="button" class="button" onclick="submitLogistics()">Crear operación con los materiales añadidos</button></div></div>
-      <div class="divider"></div><h3>Seguimiento de movimientos</h3>
+      <div class="divider"></div><h3>Seguimiento de movimientos</h3><button type="button" class="button secondary" onclick="auditReservationsUiRC11()">Comprobar reservas (solo lectura)</button><pre id="reservationAuditRC11" style="white-space:pre-wrap" aria-live="polite"></pre>
       <div id="logisticsList" class="spacer"></div>
     </section>
 
@@ -388,6 +388,8 @@
       if(available && available.receiptStatus!=='COMPLETA' && (available.lines||[]).some(l=>Number(l.pending)>0)){
         chooseSiteOrder(orderId);
         if($('siteOrder').value!==orderId)return false;
+        const zone=deepLinkParams.get('zone');
+        if(zone){if(!(state.zones||[]).some(z=>z.CODIGO===zone&&z.AREA==='ALMACEN')){pendingDeepLinkOrder=null;status('La zona elegida no está activa en este almacén. Selecciona una zona válida antes de guardar.','error');$('rZone').value='';return true;}$('rZone').value=zone;receiptZoneHint();}
         pendingDeepLinkOrder=null;
         status('Pedido abierto desde Site Control en '+(state.currentWarehouse?.name||'este almacén')+'. Comprueba el albarán antes de guardar.','info');
         return true;
@@ -430,7 +432,7 @@
     const pages={map:['Layout','Consulta la distribución real de la nave y el inventario por ubicación.'],quality:['Cuarentena','Material inmovilizado a la espera de la decisión de Calidad.'],stock:['Existencias','Material disponible por proyecto y ubicación.'],notifications:['Notificaciones','Recepciones pendientes y solicitudes de uso de stock protegido.'],transfers:['Traspasos','Consumos cruzados y saldos pendientes de compensar entre proyectos.'],logistics:['Operaciones de material','Movimientos internos, traslados y consumos a obra con identificación QR y múltiples referencias.'],moves:['Movimientos','Consulta la trazabilidad y confirma las entregas pendientes.'],receipt:['Nueva recepción','Registra la entrada de material con su albarán.'],transfer:['Mover material','Traslada existencias entre ubicaciones.']};
     function view(id,load=true){if(!pages[id]||(id==='receipt'&&!state.canReceive)||(id==='transfer'&&!['ADMIN','ALMACEN'].includes(state.user?.role)))return;
       activeView=id;Object.keys(pages).forEach(k=>{$(k).hidden=k!==id});document.querySelectorAll('.tab').forEach(b=>{let selected=b.dataset.view===id;b.classList.toggle('active',selected);b.setAttribute('aria-current',selected?'page':'false')});
-      $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(load&&id==='moves'&&!Array.isArray(state.movements))refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
+      $('pageTitle').textContent=pages[id][0];$('pageIntro').textContent=pages[id][1];if(id==='receipt'&&load){openReceiptDestinationRC11();return;}if(load&&id==='moves'&&!Array.isArray(state.movements))refresh().catch(fail);window.scrollTo({top:0,behavior:'smooth'})}
     const normalize=s=>String(s??'').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     function destinationNeedsValidation(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return false;let tag=normalize([z.CODIGO,z.NOMBRE].join(' '));return ['CAMPA','OBRA'].includes(z.AREA)||tag.includes('zaz081')||tag.includes('zaz091')}
     function projectForDestination(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return '';let tag=normalize([z.CODIGO,z.NOMBRE].join(' '));if(tag.includes('081')||tag.includes('zaz81'))return 'ZAZ081';if(tag.includes('091')||tag.includes('zaz91'))return 'ZAZ091';return ''}
@@ -972,7 +974,6 @@
       actionBusy=true;status('Anulando movimiento…','info');
       try{await call('cancelMove',{batchId});await afterSave('Movimiento '+batchId.slice(0,8)+' anulado.','moves')}catch(e){fail(e)}finally{actionBusy=false}}
     let policyBusy=false;async function savePolicy(){if(policyBusy||!['ADMIN','JEFE'].includes(state.user?.role))return;policyBusy=true;const button=document.querySelector('button[onclick="savePolicy()"]');if(button){button.disabled=true;button.textContent='Guardando…'}let materialId=$('policyMaterial').value,project=$('policyProject').value,criticality=$('policyCriticality').value,reserve=$('policyReserve').value||'0',needDate=$('policyDate').value;if(!materialId||!project){status('Selecciona material y proyecto.','error');return}try{await call('saveMaterialPolicy',{materialId,project,criticality,reserve,needDate});await refresh();status('Protección de stock guardada.')}catch(e){fail(e)}finally{policyBusy=false;if(button){button.disabled=false;button.textContent='Guardar protección'}}}
-    function showReceiptLabels(labels){lastReceiptLabels=labels||[];let box=$('receiptLabels');if(!lastReceiptLabels.length){box.hidden=true;return}let materials=lastReceiptLabels.filter(x=>x.type==='MATERIAL').length,quarantine=lastReceiptLabels.filter(x=>x.type==='CUARENTENA').length;box.hidden=false;box.innerHTML='<div><strong>'+materials+' etiqueta(s) de material'+(quarantine?' + '+quarantine+' de cuarentena':'')+' preparada(s).</strong> El QR de material identifica la referencia, no una cantidad ni un lote.</div><button type="button" class="button secondary small" style="margin-top:10px" onclick="printLabels(lastReceiptLabels)">Imprimir etiquetas</button>'}
     function expectedReceiptLabels(payload,backendLabels){
       let out=Array.isArray(backendLabels)?backendLabels.slice():[],has=(type,ref)=>out.some(x=>x.type===type&&normalizedReference(x.reference)===normalizedReference(ref));
       (payload.lines||[]).forEach((line,i)=>{
@@ -1000,37 +1001,157 @@
       printLabels([{type:'MATERIAL',reference,description:String(row.description||''),manufacturer:String(row.manufacturer||'')}]);
     }
 
+    function showReceiptLabels(labels){showReceiptLabelsRC11(labels);}
+    function zplFieldRC11(value){
+      return [...new TextEncoder().encode(String(value??'').replace(/[\r\n\t]/g,' '))].map(b=>'_'+b.toString(16).padStart(2,'0').toUpperCase()).join('');
+    }
+    function buildZplRC11(labels){
+      if(!Array.isArray(labels)||!labels.length)throw Error('Selecciona al menos una etiqueta.');
+      const text=(x,y,height,width,maxLines,value)=>'^FO'+x+','+y+'^A0N,'+height+','+Math.round(height*.8)+'^FB'+width+','+maxLines+',2,L,0^FH_^FD'+zplFieldRC11(value)+'^FS';
+      return labels.map(l=>{
+        const isLot=l.type==='LOTE',isQ=l.type==='CUARENTENA';
+        const reference=String(l.reference||'').trim();if(!reference)throw Error('Falta la referencia de una etiqueta.');
+        if((isLot||isQ)&&!l.lotId)throw Error('Falta el identificador del lote.');
+        const code=isLot?'CELLARIQ:LOT:'+l.lotId:isQ?'CELLARIQ:Q:'+l.lotId:'CELLARIQ:MAT:'+reference;
+        const bytes=new TextEncoder().encode(code).length,magnification=bytes>200?2:bytes>100?3:4;
+        const title=isQ?'CUARENTENA':'LEVITEC WAREHOUSE';
+        const referenceHeight=reference.length>45?15:reference.length>35?23:reference.length>22?27:34;
+        const description=String(l.description||'').trim();
+        const foot=isLot?l.lotId:isQ?l.lotId:'QR MATERIAL';
+        const details=(isLot||isQ)?String(l.quantity??'')+' '+String(l.unit||'')+' · '+String(l.project||''):'Referencia de material';
+        // 8 puntos/mm: 600 × 400 puntos. No cambia oscuridad, velocidad ni calibra.
+        return '^XA\n^CI28\n^PON\n^PW600\n^LL400\n^LH0,0\n^LS0\n^LT0\n'+
+          text(264,32,17,304,1,title)+'\n'+text(264,62,referenceHeight,304,reference.length>45?4:2,reference)+'\n'+
+          '^FO40,104^BQN,2,'+magnification+'^FH_^FDLA,'+zplFieldRC11(code)+'^FS\n'+
+          text(264,142,25,304,4,description)+'\n'+text(264,264,17,304,2,details)+'\n'+
+          ((isLot||isQ)?text(264,308,16,304,2,isLot?'Cantidad inicial de recepción':String(l.reason||'Pendiente de revisión'))+'\n':'')+
+          text(32,365,15,536,1,foot)+'\n^PQ1,0,1,N\n^XZ';
+      }).join('\n');
+    }
+    function downloadZplRC11(labels){
+      try{
+        const url=URL.createObjectURL(new Blob([buildZplRC11(labels)],{type:'application/octet-stream'})),a=document.createElement('a');
+        a.href=url;a.download='LEVITEC-ZD421-75x50.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }catch(e){fail(e);}
+    }
+    function printSelectedReceiptLabelsRC11(){
+      const selected=[...document.querySelectorAll('#receiptLabels input[data-label-index]:checked')].map(x=>lastReceiptLabels[Number(x.dataset.labelIndex)]).filter(Boolean);
+      printLabels(selected);
+    }
+    function showReceiptLabelsRC11(labels){
+      lastReceiptLabels=labels||[];const box=$('receiptLabels');box.hidden=!lastReceiptLabels.length;if(box.hidden)return;
+      box.innerHTML='<strong>Selecciona las etiquetas que quieres imprimir</strong><p>Una etiqueta por selección. Las de referencia conservan CELLARIQ:MAT:. Lote y cuarentena se eligen aparte.</p>'+lastReceiptLabels.map((l,i)=>'<label style="display:block;margin:8px 0"><input type="checkbox" data-label-index="'+i+'" '+(l.type==='MATERIAL'?'checked':'')+'> '+esc(l.type)+' · '+esc(l.reference)+' '+esc(l.lotId||'')+'</label>').join('')+'<button type="button" class="button secondary" onclick="printSelectedReceiptLabelsRC11()">Vista previa / imprimir seleccionadas</button>';
+    }
+
     function printLabels(labels){
       if(!Array.isArray(labels)||!labels.length){status('No hay etiquetas para imprimir.','error');return}
       const w=window.open('','_blank');
       if(!w){status('Permite ventanas emergentes para imprimir etiquetas.','error');return}
       const cards=labels.map(l=>{
-        const isQ=l.type==='CUARENTENA';
-        const code=isQ?'CELLARIQ:Q:'+l.lotId:'CELLARIQ:MAT:'+l.reference;
+        const isQ=l.type==='CUARENTENA',isLot=l.type==='LOTE';
+        const code=isQ?'CELLARIQ:Q:'+l.lotId:isLot?'CELLARIQ:LOT:'+l.lotId:'CELLARIQ:MAT:'+l.reference;
         const qr='https://quickchart.io/qr?size=240&margin=0&text='+encodeURIComponent(code);
         return '<section class="label '+(isQ?'q':'')+'"><div class="qr"><img alt="QR" src="'+qr+'"></div><div class="info">'+
           (isQ?'<div class="flag">CUARENTENA</div>':'<div class="eyebrow">LEVITEC · WAREHOUSE</div>')+
           '<div class="reference">'+esc(l.reference)+'</div><div class="description">'+esc(l.description)+'</div>'+
           (l.manufacturer?'<div class="manufacturer">'+esc(l.manufacturer)+'</div>':'')+
-          (isQ?'<div class="details">'+esc(l.quantity)+' '+esc(l.unit)+' · '+esc(l.project)+'</div><div class="details">'+esc(l.zone)+' · '+esc(l.reason||'Pendiente de revisión')+'</div><div class="foot">'+esc(l.lotId)+'</div>':'<div class="foot">QR MATERIAL · '+esc(l.reference)+'</div>')+
+          ((isQ||isLot)?'<div class="details">'+esc(l.quantity)+' '+esc(l.unit)+' · '+esc(l.project)+'</div><div class="details">'+esc(l.zone)+' · '+esc(isLot?'Cantidad inicial · recepción':(l.reason||'Pendiente de revisión'))+'</div><div class="foot">'+esc(l.lotId)+'</div>':'<div class="foot">QR MATERIAL · '+esc(l.reference)+'</div>')+
           '</div></section>';
       }).join('');
-      const css=`@page{size:75mm 50mm;margin:0}*{box-sizing:border-box}html,body{margin:0!important;padding:0!important;width:75mm;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}section.label{position:relative;width:75mm;height:50mm;margin:0;padding:0;overflow:hidden;break-after:page;page-break-after:always}section.label:last-child{break-after:auto;page-break-after:auto}.qr{position:absolute;left:4mm;top:11mm;width:26mm;height:26mm}.qr img{display:block;width:26mm;height:26mm;object-fit:contain}.info{position:absolute;left:33mm;top:5mm;width:38mm;height:40mm;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}.eyebrow{font-size:6pt;font-weight:700;letter-spacing:.02em;color:#444;margin-bottom:1mm}.reference{font-size:11pt;font-weight:800;overflow-wrap:anywhere;line-height:1.1;margin-bottom:1.2mm}.description{font-size:8pt;font-weight:600;line-height:1.15;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}.manufacturer{font-size:6.5pt;margin-top:1mm;overflow-wrap:anywhere}.foot{font-size:5.5pt;margin-top:1.6mm;overflow-wrap:anywhere}.flag{font-size:9pt;font-weight:900;color:#8a3300;margin-bottom:1mm}.details{font-size:6.5pt;margin-top:1mm;overflow-wrap:anywhere}.q{outline:0.6mm solid #a54b00;outline-offset:-0.6mm}@media screen{body{background:#e9edf0;padding:10mm!important;width:auto}section.label{background:white;margin:0 auto 6mm;box-shadow:0 2px 12px #0002}}@media print{html,body{width:75mm!important;height:auto!important;margin:0!important;padding:0!important}section.label{margin:0!important;box-shadow:none!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}}`;
+      const css=`@page{size:75mm 50mm;margin:0;page-orientation:upright}@page levitecHorizontal{size:75mm 50mm;margin:0;page-orientation:upright}*{box-sizing:border-box}html,body{margin:0!important;padding:0!important;width:75mm;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif}section.label{page:levitecHorizontal;position:relative;width:75mm;height:50mm;margin:0;padding:0;overflow:hidden;break-after:page;page-break-after:always}section.label:last-child{break-after:auto;page-break-after:auto}.qr{position:absolute;left:4mm;top:11mm;width:26mm;height:26mm}.qr img{display:block;width:26mm;height:26mm;object-fit:contain}.info{position:absolute;left:33mm;top:5mm;width:38mm;height:40mm;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}.eyebrow{font-size:6pt;font-weight:700;letter-spacing:.02em;color:#444;margin-bottom:1mm}.reference{font-size:11pt;font-weight:800;overflow-wrap:anywhere;line-height:1.1;margin-bottom:1.2mm}.description{font-size:8pt;font-weight:600;line-height:1.15;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}.manufacturer{font-size:6.5pt;margin-top:1mm;overflow-wrap:anywhere}.foot{font-size:5.5pt;margin-top:1.6mm;overflow-wrap:anywhere}.flag{font-size:9pt;font-weight:900;color:#8a3300;margin-bottom:1mm}.details{font-size:6.5pt;margin-top:1mm;overflow-wrap:anywhere}.q{outline:0.6mm solid #a54b00;outline-offset:-0.6mm}@media screen{body{background:#e9edf0;padding:10mm!important;width:auto}section.label{background:white;margin:0 auto 6mm;box-shadow:0 2px 12px #0002}}.printTools{max-width:640px;margin:0 auto 8mm;font:14px Arial;line-height:1.5;padding:16px;background:white;border-radius:8px}.printTools button{padding:10px 20px;cursor:pointer}@media print{.printTools{display:none!important}html,body{width:75mm!important;height:auto!important;margin:0!important;padding:0!important}section.label{margin:0!important;box-shadow:none!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}}`;
       w.document.open();
-      w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Etiquetas LEVITEC 75×50 mm</title><style>'+css+'</style></head><body>'+cards+'</body></html>');
+      w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Etiquetas LEVITEC 75×50 mm</title><style>'+css+'</style></head><body><aside class="printTools"><strong>Etiquetas horizontales · 75 × 50 mm</strong><p>Comprueba la vista previa antes de imprimir. En la impresora elige papel de 75 × 50 mm, orientación horizontal, escala 100 %, márgenes ninguno y desactiva encabezados y pies. Si el controlador cambia la orientación, revisa sus preferencias.</p><button type="button" id="printReadyButton" disabled onclick="window.print()">Preparando QR…</button> <button type="button" id="zplDownloadButton">Descargar ZPL · Zebra ZD421</button><p>El archivo ZPL se envía con una herramienta Zebra. Esta web no lo envía automáticamente a la impresora.</p></aside>'+cards+'</body></html>');
       w.document.close();
+      const zplButton=w.document.getElementById('zplDownloadButton');if(zplButton)zplButton.onclick=()=>downloadZplRC11(labels);
       // Esperar a que se carguen los QR; evitar etiquetas sin código por impresión prematura.
       const ready=()=>{
         const images=Array.from(w.document.images);
         Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve}))).then(()=>{
           if(images.some(img=>!img.naturalWidth)){w.alert('No se han podido cargar todos los QR. Comprueba la conexión antes de imprimir.');return}
-          w.focus();w.print();
+          const button=w.document.getElementById('printReadyButton');if(button){button.disabled=false;button.textContent='Imprimir horizontal · 75 × 50 mm';}w.focus();
         });
       };
       if(w.document.readyState==='complete')ready();else w.addEventListener('load',ready,{once:true});
     }
-    async function lookupQr(){let code=$('qrCode').value.trim();if(!code){status('Introduce o escanea una referencia de material.','error');return}try{await refresh();let r;try{r=await call('getMaterialByQr',{code})}catch(apiError){if(!/Acción no válida/i.test(String(apiError&&apiError.message||apiError)))throw apiError;r=materialQrSummaryLocally(code);status('El frontend está actualizado pero el backend desplegado es anterior. He localizado el material localmente; vuelve a desplegar LEVITEC Warehouse v1.0 para dejar ambas versiones sincronizadas.','info')}
-      let material=r.material,stock=r.stock||[],warehouse=stock.filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0),quarantine=stock.filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0);if(!warehouse.length)throw Error('La referencia existe, pero no tiene stock disponible en almacén. Cuarentena: '+quarantine.reduce((sum,x)=>sum+Number(x.quantity),0)+' '+material.UNIDAD+'.');let byZone={};warehouse.forEach(x=>byZone[x.zone]=(byZone[x.zone]||0)+Number(x.quantity));let zones=Object.entries(byZone).sort((a,b)=>b[1]-a[1]),preferred=zones[0][0];view('transfer',false);if([...$('mOrigin').options].some(o=>o.value===preferred))$('mOrigin').value=preferred;available();if([...$('mMaterial').options].some(o=>o.value===material.ID))$('mMaterial').value=material.ID;scannedMaterialRef=material.REFERENCIA;renderMoveSummary();let total=warehouse.reduce((sum,x)=>sum+Number(x.quantity),0),qtotal=quarantine.reduce((sum,x)=>sum+Number(x.quantity),0),zoneText=zones.map(([z,q])=>z+' '+q+' '+material.UNIDAD).join(' · ');status('Material localizado: '+material.REFERENCIA+' · '+material.DESCRIPCION+' · disponible '+total+' '+material.UNIDAD+(qtotal?' · cuarentena '+qtotal+' '+material.UNIDAD:'')+' · '+zoneText,'success')}catch(e){fail(e)}}
+    let qrCardRC11=null;
+    async function auditReservationsUiRC11(){
+      const box=$('reservationAuditRC11');box.textContent='Comprobando reservas…';
+      try{const r=await call('auditReservationsRC11');box.textContent=r.issues?.length?JSON.stringify(r.issues,null,2):'Sin incoherencias de reservas detectadas. No se han modificado datos.';}
+      catch(e){box.textContent=e.message;}
+    }
+    function receiptDestinationDialogRC11(){
+      let d=$('receiptDestinationRC11');if(d)return d;
+      d=document.createElement('dialog');d.id='receiptDestinationRC11';d.style.cssText='max-width:540px;width:90%;border:0;border-radius:14px;padding:24px';
+      d.innerHTML='<h2>Destino de recepción</h2><p>Selecciona almacén y zona conforme. Las cantidades y la cuarentena se revisan en el formulario.</p><label class="field">Almacén<select id="destinationWarehouseRC11"></select></label><label class="field">Zona<select id="destinationZoneRC11"></select></label><p id="destinationStatusRC11" role="status"></p><button class="button" id="destinationContinueRC11">Continuar</button> <button class="button secondary" id="destinationCancelRC11">Cancelar</button>';
+      document.body.appendChild(d);$('destinationCancelRC11').onclick=()=>d.close();
+      $('destinationWarehouseRC11').onchange=loadDestinationRC11;
+      $('destinationContinueRC11').onclick=async()=>{
+        const id=$('destinationWarehouseRC11').value,zone=$('destinationZoneRC11').value;
+        if(!id||!zone||!d._config?.canReceive)return;
+        $('destinationContinueRC11').disabled=true;
+        try{
+          if(id!==state.currentWarehouse?.id){$('warehouseSelector').value=id;await changeWarehouse();}
+          if(state.currentWarehouse?.id!==id||!state.canReceive)throw Error('No se ha podido seleccionar un destino autorizado.');
+          if(!(state.zones||[]).some(z=>z.CODIGO===zone&&z.AREA==='ALMACEN'))throw Error('La zona ya no está disponible.');
+          $('rZone').value=zone;receiptZoneHint();d.close();view('receipt',false);
+        }catch(e){$('destinationStatusRC11').textContent=e.message;}finally{$('destinationContinueRC11').disabled=false;}
+      };return d;
+    }
+    async function loadDestinationRC11(){
+      const d=receiptDestinationDialogRC11(),id=$('destinationWarehouseRC11').value;
+      d._config=null;$('destinationZoneRC11').replaceChildren(new Option('Selecciona zona',''));$('destinationContinueRC11').disabled=true;
+      if(!id){$('destinationStatusRC11').textContent='Selecciona un almacén disponible; Nave 15 no se sustituye automáticamente por otra nave.';return;}
+      $('destinationStatusRC11').textContent='Comprobando zonas y permisos…';
+      try{
+        const config=await call('bootstrap',{warehouseId:id});
+        if($('destinationWarehouseRC11').value!==id)return;
+        d._config=config;
+        if(!config.canReceive)throw Error('No tienes permiso de recepción en este almacén. Elige otro destino.');
+        (config.zones||[]).filter(z=>z.AREA==='ALMACEN').forEach(z=>$('destinationZoneRC11').add(new Option(z.NOMBRE+' · '+z.CODIGO,z.CODIGO)));
+        $('destinationZoneRC11').onchange=()=>{$('destinationContinueRC11').disabled=!$('destinationZoneRC11').value;};
+        $('destinationStatusRC11').textContent='Selecciona la zona de recepción.';
+      }catch(e){$('destinationStatusRC11').textContent=e.message;}
+    }
+    function openReceiptDestinationRC11(){
+      if(receiptSaving||pendingReceipt){status('Resuelve la recepción pendiente antes de cambiar su destino.','error');return;}
+      if(document.querySelectorAll('#receiptLines .line').length&&[...document.querySelectorAll('#receiptLines .receivedQty')].some(x=>x.value)&&!confirm('La recepción tiene cantidades sin guardar. ¿Elegir otro destino?'))return;
+      const d=receiptDestinationDialogRC11(),select=$('destinationWarehouseRC11');
+      select.replaceChildren(new Option('Selecciona almacén',''));(state.warehouses||[]).forEach(w=>select.add(new Option(w.name+' · '+w.id,w.id)));
+      select.value=(state.warehouses||[]).some(w=>w.id==='HUE-MEC-N15')?'HUE-MEC-N15':'';d.showModal();loadDestinationRC11();
+    }
+    async function lookupQr(){
+      const code=$('qrCode').value.trim();if(!code){status('Introduce o escanea una referencia o un lote.','error');return;}
+      try{
+        let data;
+        if(/^CELLARIQ:(LOT|Q):/i.test(code))data=await call('lotTraceRC11',{code});
+        else {const r=await call('getMaterialByQr',{code});data={material:r.material,stock:r.stock||[],lots:(state.lots||[]).filter(l=>l.MATERIAL_ID===r.material.ID),events:[],scope:'MATERIAL'};}
+        renderQrCardRC11(data);
+      }catch(e){fail(e);}
+    }
+    function renderQrCardRC11(data){
+      qrCardRC11=data;let d=$('qrCardRC11');
+      if(!d){d=document.createElement('dialog');d.id='qrCardRC11';d.style.cssText='width:94%;max-width:760px;max-height:90vh;overflow:auto;border:0;border-radius:14px;padding:24px';document.body.appendChild(d);}
+      const m=data.material||{},lot=data.lot;
+      d.innerHTML='<h2>'+esc(m.REFERENCIA||lot?.REFERENCIA)+'</h2><p>'+esc(m.DESCRIPCION||lot?.DESCRIPCION)+'</p>'+
+        (lot?'<p><b>Lote '+esc(lot.ID_LOTE_MATERIAL)+'</b> · '+esc(lot.PROVEEDOR)+' · albarán '+esc(lot.DOCUMENTO)+'</p><p>Recepción '+esc(lot.RECEPCION_ID)+' · '+esc(lot.CANTIDAD_INICIAL)+' '+esc(lot.UNIDAD)+' iniciales · '+esc(lot.ALMACEN_ID)+' / '+esc(lot.ZONA_INICIAL)+'</p>':'')+
+        '<h3>Existencias de la referencia en este almacén</h3>'+((data.stock||[]).map(x=>'<p>'+esc(x.project)+' · '+esc(x.zone)+' · '+esc(x.quantity)+' '+esc(x.unit)+'</p>').join('')||'<p>Sin existencias de esta referencia en el almacén consultado.</p>')+
+        '<p>Las existencias por referencia no certifican el saldo físico de un lote. Los movimientos antiguos sin identificador de lote requieren conciliación.</p>'+
+        '<h3>Lotes de recepción</h3>'+(data.lots||[lot].filter(Boolean)).map((l,i)=>'<p>'+esc(l.ID_LOTE_MATERIAL)+' · '+esc(l.DOCUMENTO)+' <button class="button secondary small" data-lot-index="'+i+'">Ficha y reimpresión</button></p>').join('')+
+        '<h3>Eventos vinculados al lote</h3>'+((data.events||[]).map(e=>'<p>'+esc(e.FECHA)+' · '+esc(e.TIPO)+' · '+esc(e.CANTIDAD)+' '+esc(e.UNIDAD)+' · '+esc(e.ORIGEN)+' → '+esc(e.DESTINO)+' · '+esc(e.ACTOR)+'</p>').join('')||'<p>Consulta la ficha de un lote para ver sus eventos identificados.</p>')+
+        '<div class="actions"><button class="button secondary" id="qrPrintMaterialRC11">Etiqueta de referencia</button>'+(lot?'<button class="button secondary" id="qrPrintLotRC11">Reimprimir lote</button>':'')+
+        '<button class="button" id="qrPrepareMoveRC11">Preparar traslado</button><button class="button secondary" id="qrCloseRC11">Cerrar</button></div><p>Preparar una acción no registra movimientos. Comprueba origen, propietario, cantidad y destino.</p>';
+      d.querySelectorAll('[data-lot-index]').forEach(btn=>btn.onclick=async()=>{const l=(data.lots||[lot])[Number(btn.dataset.lotIndex)];try{renderQrCardRC11(await call('lotTraceRC11',{code:'CELLARIQ:LOT:'+l.ID_LOTE_MATERIAL}));}catch(e){fail(e);}});
+      $('qrCloseRC11').onclick=()=>d.close();$('qrPrintMaterialRC11').onclick=()=>printLabels([{type:'MATERIAL',reference:m.REFERENCIA||lot?.REFERENCIA,description:m.DESCRIPCION||lot?.DESCRIPCION}]);
+      if(lot)$('qrPrintLotRC11').onclick=()=>printLabels([{type:'LOTE',lotId:lot.ID_LOTE_MATERIAL,reference:lot.REFERENCIA,description:lot.DESCRIPCION,quantity:lot.CANTIDAD_INICIAL,unit:lot.UNIDAD,project:lot.PROYECTO_ORIGEN,zone:lot.ZONA_INICIAL}]);
+      $('qrPrepareMoveRC11').onclick=async()=>{
+        if(!['ADMIN','ALMACEN'].includes(state.user?.role)){status('No tienes permiso para expedir desde este almacén.','error');return;}
+        d.close();view('logistics',false);selectLogisticsFlow('TRANSFER');$('lOrigin').value=state.currentWarehouse.id;
+        await logisticsChoices();$('lSearch').value=m.REFERENCIA||lot?.REFERENCIA||'';$('lLotRC11').value=lot?.ID_LOTE_MATERIAL||'';logisticsMaterialChoices();
+      };
+      $('qrPrepareMoveRC11').disabled=!['ADMIN','ALMACEN'].includes(state.user?.role);
+      if(!d.open)d.showModal();
+    }
+
     async function scanQr(forLogistics=false){if(!window.Html5Qrcode){status('El lector QR no se ha cargado. Puedes escribir la referencia manualmente.','error');return}let overlay=$('qrScanner');overlay.hidden=false;overlay.style.display='grid';$('qrScannerStatus').textContent='Solicitando acceso a la cámara…';try{qrScannerInstance=new Html5Qrcode('qrReader');await qrScannerInstance.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250},aspectRatio:1.0},async decoded=>{await stopQrScanner();if(forLogistics)await logisticsQrScanned(decoded);else{$('qrCode').value=decoded;await lookupQr()}},()=>{});$('qrScannerStatus').textContent='Apunta al QR del material. Mantén la etiqueta dentro del recuadro.'}catch(e){await stopQrScanner();status('No se pudo abrir la cámara. Revisa el permiso de cámara en Safari o introduce la referencia manualmente. '+(e&&e.message?e.message:''),'error')}}
     async function stopQrScanner(){let inst=qrScannerInstance;qrScannerInstance=null;if(inst){try{await inst.stop()}catch(_){}try{await inst.clear()}catch(_){}}let overlay=$('qrScanner');overlay.hidden=true;overlay.style.display='none';let reader=$('qrReader');if(reader)reader.innerHTML=''}
     function exportStock(){let rows=filteredStock();if(!rows.length){status('No hay existencias visibles para exportar.','error');return}
@@ -1114,9 +1235,9 @@
       return valid;
     }
     function chooseLogisticsMaterial(id){$('lMaterial').value=id;logisticsQrValidated='';$('lQr').value='';$('lQrStatus').textContent='QR opcional: verifica solo si lo utilizas.';logisticsMaterialChoices()}
-    function logisticsQrReference(code){const raw=String(code||'').trim();if(raw.toUpperCase().startsWith('CELLARIQ:MAT:'))return raw.slice(13).trim();return raw;}
+    function logisticsQrReference(code){const raw=String(code||'').trim();if(raw.toUpperCase().startsWith('CELLARIQ:MAT:'))return raw.slice('CELLARIQ:MAT:'.length).trim();return raw;}
     function validateLogisticsQr(){const id=$('lMaterial').value;const row=(logisticsCatalogState.stock||[]).find(x=>id===x.materialId+'|'+x.ownerProject+'|'+x.zone);const code=$('lQr').value.trim();const matched=!!row&&!!code&&normalize(logisticsQrReference(code))===normalize(row.reference);logisticsQrValidated=matched?id:'';$('lQrStatus').textContent=matched?'QR verificado: '+row.reference:code?'El QR no coincide con el material seleccionado.':'Introduce o escanea el QR.';return matched;}
-    async function logisticsQrScanned(decoded){$('lQr').value=decoded;if(validateLogisticsQr())status('QR del material verificado.','success');else status('El QR no corresponde a la referencia seleccionada.','error');}
+    async function logisticsQrScanned(decoded){if(/^CELLARIQ:(LOT|Q):/i.test(decoded)){try{const trace=await call('lotTraceRC11',{code:decoded});$('lLotRC11').value=trace.lot.ID_LOTE_MATERIAL;decoded='CELLARIQ:MAT:'+trace.lot.REFERENCIA;}catch(e){fail(e);return;}}$('lQr').value=decoded;if(validateLogisticsQr())status('QR del material verificado.','success');else status('El QR no corresponde a la referencia seleccionada.','error');}
     function addLogisticsLine(){
       const [materialId,ownerProject,originZone]=($('lMaterial').value||'').split('|'),destinationZone=$('lDestinationZone').value,quantity=Number($('lQty').value);
       const row=(logisticsCatalogState.stock||[]).find(x=>x.materialId===materialId&&x.zone===originZone&&x.ownerProject===ownerProject);
@@ -1126,12 +1247,12 @@
       if(logisticsFlow==='INTERNAL'&&originZone===destinationZone)return throwFailLogistics('Selecciona una zona de destino diferente para el movimiento interno.');
       const previous=logisticsCart.filter(x=>x.materialId===materialId&&x.originZone===originZone&&x.ownerProject===ownerProject).reduce((n,x)=>n+x.quantity,0);
       if(previous+quantity>Number(row.quantity)+1e-8)return throwFailLogistics('La cantidad supera el stock disponible.');
-      logisticsCart.push({materialId,ownerProject,originZone,destinationZone:logisticsFlow==='CONSUME'?'CONSUMO':destinationZone,quantity,reference:row.reference,description:row.description,unit:row.unit,originWarehouse:$('lOrigin').value,destinationWarehouse:logisticsFlow==='INTERNAL'?$('lOrigin').value:$('lDestination').value,qrCode:$('lQr').value.trim(),project:LOGISTICS_WORKS[$('lDestination').value]||''});
+      logisticsCart.push({materialLotId:$('lLotRC11').value.trim(),materialId,ownerProject,originZone,destinationZone:logisticsFlow==='CONSUME'?'CONSUMO':destinationZone,quantity,reference:row.reference,description:row.description,unit:row.unit,originWarehouse:$('lOrigin').value,destinationWarehouse:logisticsFlow==='INTERNAL'?$('lOrigin').value:$('lDestination').value,qrCode:$('lQr').value.trim(),project:LOGISTICS_WORKS[$('lDestination').value]||''});
       $('lQty').value='';$('lQr').value='';logisticsQrValidated='';$('lQrStatus').textContent='Selecciona el siguiente material.';renderLogisticsCart();logisticsMaterialChoices();
     }
     function removeLogisticsLine(index){logisticsCart.splice(index,1);renderLogisticsCart();logisticsMaterialChoices()}
     function renderLogisticsCart(){
-      $('logisticsCart').innerHTML=logisticsCart.length?'<h3>Materiales de la operación · '+logisticsCart.length+' líneas</h3>'+logisticsCart.map((x,i)=>'<div class="line"><div class="line-title"><b>'+esc(x.reference)+' · '+esc(x.description)+'</b><button class="button secondary small" onclick="removeLogisticsLine('+i+')">Quitar</button></div><p>'+esc(x.quantity)+' '+esc(x.unit)+' · '+(x.qrCode?'QR verificado':'Sin QR')+' · propietario '+esc(x.ownerProject)+' · '+esc(logisticsZoneName(x.originZone))+' → '+esc(logisticsZoneName(x.destinationZone))+'</p></div>').join(''):'<p class="muted">Añade los materiales que deseas trasladar.</p>';
+      $('logisticsCart').innerHTML=logisticsCart.length?'<h3>Materiales de la operación · '+logisticsCart.length+' líneas</h3>'+logisticsCart.map((x,i)=>'<div class="line"><div class="line-title"><b>'+esc(x.reference)+' · '+esc(x.description)+'</b><button class="button secondary small" onclick="removeLogisticsLine('+i+')">Quitar</button></div><p>'+esc(x.quantity)+' '+esc(x.unit)+' · '+(x.qrCode?'QR verificado':'Sin QR')+(x.materialLotId?' · lote '+esc(x.materialLotId):' · sin lote identificado')+' · propietario '+esc(x.ownerProject)+' · '+esc(logisticsZoneName(x.originZone))+' → '+esc(logisticsZoneName(x.destinationZone))+'</p></div>').join(''):'<p class="muted">Añade los materiales que deseas trasladar.</p>';
     }
     const V116_PENDING_KEY='levitec_warehouse_pending_operation_v116';
     function v116Pending(){try{return JSON.parse(sessionStorage.getItem(V116_PENDING_KEY)||'null')}catch{return null}}
@@ -1173,7 +1294,7 @@
         });
         logisticsCatalogState=latest;
         if(shortages.length){logisticsMaterialChoices();throw Error('No se ha enviado la operación. Corrige las líneas: '+shortages.join(' | '));}
-        const data={clientId:pendingLogisticsClientId||(pendingLogisticsClientId='LOGCLIENT-'+crypto.randomUUID()),mode,originWarehouse,destinationWarehouse,project:LOGISTICS_WORKS[destinationWarehouse]||'',note:$('lNote').value.trim(),lines:logisticsCart.map(x=>({materialId:x.materialId,originZone:x.originZone,destinationZone:x.destinationZone,ownerProject:x.ownerProject,quantity:x.quantity,qrCode:x.qrCode}))};
+        const data={clientId:pendingLogisticsClientId||(pendingLogisticsClientId='LOGCLIENT-'+crypto.randomUUID()),mode,originWarehouse,destinationWarehouse,project:LOGISTICS_WORKS[destinationWarehouse]||'',note:$('lNote').value.trim(),lines:logisticsCart.map(x=>({materialId:x.materialId,originZone:x.originZone,destinationZone:x.destinationZone,ownerProject:x.ownerProject,quantity:x.quantity,qrCode:x.qrCode,materialLotId:x.materialLotId||''}))};
         if(!confirm('¿Crear '+(mode==='INTERNA'?'movimiento interno':mode==='DIRECTA'?'expedición':'solicitud')+' con '+logisticsCart.length+' líneas?'))return;
         // Se guarda ANTES de enviar. Si se pierde la respuesta, solo se permite consultar el estado.
         const frozen={id:data.clientId,mode,originWarehouse,destinationWarehouse,createdAt:Date.now()};v116Store(frozen);
@@ -1291,7 +1412,7 @@
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
-        let backendMismatch=state.apiVersion&&state.apiVersion!=='1.20-rc2-prod';
+        let backendMismatch=state.apiVersion&&!['1.20-rc2-prod','1.20-rc11'].includes(state.apiVersion);
 
         $('login').hidden=true;
         $('app').hidden=false;
@@ -1373,10 +1494,11 @@
     }
 
     async function changeWarehouse(){
-      if(warehouseSwitching||zoneSaving){status('Espera a que termine la operación anterior.','info');renderWarehouseSelector();return;}
+      if(warehouseSwitching||zoneSaving||receiptSaving||pendingReceipt||moveSaving||actionBusy){status('Espera a que termine la operación anterior.','info');renderWarehouseSelector();return;}
       let id=$('warehouseSelector').value;
       if(!id||id===state.currentWarehouse?.id)return;
 
+      if([...document.querySelectorAll('#receiptLines .receivedQty')].some(x=>x.value)&&!confirm('Cambiar de almacén descartará las cantidades de recepción sin guardar. ¿Continuar?')){renderWarehouseSelector();return;}
       warehouseSwitching=true;warehouseEpoch++;
       drawing=false;cadHide();draftDirty=false;geometryDirty=false;draftPoints=[];editorZoneCode='';$('zoneEditor').hidden=true;delete $('mapDetail').dataset.zone;$('mapPolygons').replaceChildren();$('mapDimensions').replaceChildren();$('mapDraft').replaceChildren();clearMapMeasure();
       status('Cambiando de almacén…','info');
