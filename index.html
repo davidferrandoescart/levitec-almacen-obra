@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14273b">
-  <meta name="levitec-frontend-release" content="rc8-20261026-zebra-75x50">
+  <meta name="levitec-frontend-release" content="rc14-20261026-zonas-movil">
   <title>LEVITEC Warehouse · Producción</title>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#14273b;background:#f4f6f8;font-synthesis:none}
@@ -176,6 +176,21 @@
 /* RC13: referencia desplegable y cola de etiquetas */
 #receiptLabels:not([hidden]){display:block}
 .stock-disclosure{display:inline-flex;gap:6px;align-items:center;border:0;padding:3px 0;background:none;color:#163950;font:inherit;font-weight:750;cursor:pointer;text-align:left;white-space:nowrap}.stock-disclosure>span{color:#0c969b;min-width:10px}.stock-disclosure:focus-visible{outline:2px solid #0c969b;outline-offset:3px}.stock-breakdown>td{padding:0 16px 14px!important;background:#f5fafb}.stock-breakdown table{width:100%;background:#fff;border:1px solid #deeaed;border-radius:6px;font-size:11px}.stock-breakdown th,.stock-breakdown td{padding:9px 12px!important}.stock-breakdown th{background:#eef5f6}.stock-zone-summary{font-size:10px!important;max-width:280px;overflow-wrap:anywhere}.print-queue-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}.print-queue-heading strong{font-size:16px}.print-queue-heading p{font-size:12px;color:#627c8d;margin:5px 0 12px}.print-queue-heading>span{background:#e4f2f2;padding:6px 10px;border-radius:20px;white-space:nowrap;font-size:12px}.print-queue-list{max-height:260px;overflow:auto;border-top:1px solid #e1eaed;border-bottom:1px solid #e1eaed;margin-bottom:12px}.print-queue-item{display:flex;gap:10px;align-items:center;padding:8px 2px;font-size:12px;border-bottom:1px solid #eef2f4}.print-queue-item:last-child{border-bottom:0}.print-queue-item input{width:17px;height:17px;accent-color:#0b9498}.print-queue-item small{display:block;font-size:10px;color:#718494;margin-top:3px}
+
+
+.receipt-warehouse-dialog{width:min(540px,calc(100vw - 30px));max-height:90vh;overflow:auto;padding:0;border:1px solid #dce8ec;border-radius:18px;color:#173247;box-shadow:0 24px 70px #132d4444;font-family:inherit}.receipt-warehouse-dialog::backdrop{background:#102e4266;backdrop-filter:blur(2px)}.receipt-warehouse-heading{padding:24px;background:#f0f8f9;border-bottom:1px solid #dce8ec}.receipt-warehouse-heading small{color:#07888d;letter-spacing:.1em;font-weight:800;font-size:10px}.receipt-warehouse-heading h2{font-size:23px;margin:7px 0}.receipt-warehouse-heading p{font-size:12px;color:#668093;margin:0}.receipt-warehouse-body{padding:22px 24px}.receipt-warehouse-body .field{margin-bottom:15px}.receipt-warehouse-body select{min-height:46px}.receipt-warehouse-body p{margin:0;font-size:12px;color:#6c8294}.receipt-warehouse-footer{padding:16px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid #e0e9ee}.receipt-warehouse-footer .button{min-height:40px}.receipt-warehouse-dialog button:disabled,.receipt-warehouse-dialog select:disabled{opacity:.55;cursor:wait}
+
+
+@media screen and (max-width:760px){
+ html,body{width:100%;min-width:0}.layout{padding:20px 12px calc(24px + env(safe-area-inset-bottom));width:100%;min-width:0}.layout>*,.card,.panel,.form-grid>*,.line-grid>*,.tools>*{min-width:0;max-width:100%}
+ .topbar-inner{padding:13px 12px;flex-wrap:wrap;gap:12px}.topbar-inner .brand{width:100%}.identity{width:100%;text-align:left;justify-content:flex-start}.warehouse-switch{width:100%}.warehouse-switch select{width:100%;max-width:100%;min-width:0;min-height:44px;font-size:16px}.identity>div:last-child{display:none}
+ .panel{padding:16px}.pagehead,.panel-top,.line-title{flex-wrap:wrap;align-items:flex-start}.pagehead .button{min-height:42px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{padding:13px}.tabs{max-width:100%;min-width:0}.tab{min-height:44px;padding:10px 12px}.tools{display:grid!important}.tools>.field,.tools>.filter,.tools>.search{width:100%;grid-column:1/-1}.stock-summary .stock-ref,.stock-summary .stock-description{text-align:left!important}.stock-breakdown>td::before{display:none!important;content:none!important}
+ .form-grid.two,.form-grid.three,.line-grid{grid-template-columns:minmax(0,1fr)!important}.tools{grid-template-columns:minmax(0,1fr)!important}.form-grid label,.field{min-width:0}.button{white-space:normal;overflow-wrap:anywhere;min-height:42px}input:not([type=checkbox]):not([type=radio]),select,textarea{min-width:0;max-width:100%;font-size:16px!important}input[type=date]{min-inline-size:0}.actions{flex-wrap:wrap}.actions .button{flex:1 1 auto}
+ dialog{max-width:calc(100vw - 16px)!important;max-height:calc(100dvh - 24px)!important;overflow:auto;overscroll-behavior:contain}.receipt-warehouse-dialog{width:calc(100vw - 16px);padding:0}.receipt-warehouse-heading,.receipt-warehouse-body{padding:18px}.receipt-warehouse-footer{padding:14px 18px}.receipt-warehouse-footer .button{flex:1 1 auto}.receipt-warehouse-footer #destinationContinueRC11{flex-basis:100%;order:-1}#qrCardRC11{padding:18px!important;overflow-wrap:anywhere}#qrCardRC11 .actions{flex-direction:column}#qrCardRC11 .actions .button{width:100%}
+ .table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto}.material-choice{padding:10px;gap:8px}.material-choice-text>span{white-space:normal;max-width:100%;overflow-wrap:anywhere}.material-choice-qty{font-size:16px}.stock-disclosure{white-space:normal;overflow-wrap:anywhere;font-size:13px}.print-queue-heading{flex-wrap:wrap}.print-queue-list{max-height:230px}.print-queue-item{min-height:48px}
+ #stock .table-wrap>table{min-width:0;width:100%}#stock .table-wrap>table>thead{display:none}#stockRows{display:block;width:100%}#stockRows>.stock-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;border-bottom:1px solid #e1e9ed;padding:10px 0}#stockRows>.stock-summary>td{display:block;padding:5px!important;border:0;min-width:0}#stockRows>.stock-summary>td:nth-child(1){grid-column:1;grid-row:1;align-self:center}#stockRows>.stock-summary>td:nth-child(6){grid-column:2;grid-row:1}#stockRows>.stock-summary>td:nth-child(2){grid-column:1/-1;white-space:normal;max-width:none;font-size:12px}#stockRows>.stock-summary>td:nth-child(3),#stockRows>.stock-summary>td:nth-child(4),#stockRows>.stock-summary>td:nth-child(5){grid-column:1/-1;text-align:left}#stockRows>.stock-summary>td:nth-child(3)::before{content:'Proyecto: ';color:#718494}#stockRows>.stock-summary>td:nth-child(4)::before{content:'Ubicación: ';color:#718494}#stockRows>.stock-summary>td:nth-child(5)::before{content:'Stock físico: ';color:#718494}.stock-zone-summary{max-width:none;overflow-wrap:anywhere}.stock-breakdown{display:block}.stock-breakdown>td{display:block!important;padding:8px!important}.stock-breakdown table,.stock-breakdown tbody,.stock-breakdown tr,.stock-breakdown td{display:block;min-width:0;width:100%}.stock-breakdown thead{display:none}.stock-breakdown tbody tr{padding:7px;border-bottom:1px solid #d9e6ea}.stock-breakdown td{text-align:left!important;border:0;padding:4px!important;overflow-wrap:anywhere}.stock-breakdown td::before{font-size:10px;color:#6f8495}.stock-breakdown td:nth-child(1)::before{content:'Proyecto: '}.stock-breakdown td:nth-child(2)::before{content:'Almacén: '}.stock-breakdown td:nth-child(3)::before{content:'Zona: '}.stock-breakdown td:nth-child(4)::before{content:'Físico: '}.stock-breakdown td:nth-child(5)::before{content:'Libre: '}
+ .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;overflow:visible}.tab{min-width:0;white-space:normal;font-size:12px;padding:9px 4px;border-bottom-width:2px}
+}
 
 </style>
 </head>
@@ -1105,46 +1120,70 @@
       try{const r=await call('auditReservationsRC11');box.textContent=r.issues?.length?JSON.stringify(r.issues,null,2):'Sin incoherencias de reservas detectadas. No se han modificado datos.';}
       catch(e){box.textContent=e.message;}
     }
+    let receiptCatalogRC14=null,receiptCatalogAtRC14=0,receiptCatalogPendingRC14=null,receiptCatalogEpochRC14=0;
+    function resetReceiptCatalogRC14(){receiptCatalogEpochRC14++;receiptCatalogRC14=null;receiptCatalogAtRC14=0;receiptCatalogPendingRC14=null;state.receiptDestinationsRC14=null;}
+    function rememberReceiptCatalogRC14(catalog){if(Array.isArray(catalog)){receiptCatalogRC14=catalog;receiptCatalogAtRC14=Date.now();}}
+    async function getReceiptCatalogRC14(force=false){
+      if(!receiptCatalogRC14&&Array.isArray(state.receiptDestinationsRC14))rememberReceiptCatalogRC14(state.receiptDestinationsRC14);
+      if(!force&&receiptCatalogRC14&&Date.now()-receiptCatalogAtRC14<60000)return receiptCatalogRC14;
+      if(receiptCatalogPendingRC14)return receiptCatalogPendingRC14;
+      const epoch=receiptCatalogEpochRC14;
+      const pending=call('receiptDestinationsRC14',{}).then(result=>{
+        if(epoch!==receiptCatalogEpochRC14)throw Error('La sesión ha cambiado. Vuelve a abrir el selector.');
+        if(!Array.isArray(result.destinations))throw Error('Falta activar el backend Warehouse RC14 para cargar las zonas rápidamente.');
+        rememberReceiptCatalogRC14(result.destinations);return receiptCatalogRC14;
+      }).finally(()=>{if(receiptCatalogPendingRC14===pending)receiptCatalogPendingRC14=null;});
+      receiptCatalogPendingRC14=pending;return pending;
+    }
     function receiptDestinationDialogRC11(){
       let d=$('receiptDestinationRC11');if(d)return d;
-      d=document.createElement('dialog');d.id='receiptDestinationRC11';d.style.cssText='max-width:540px;width:90%;border:0;border-radius:14px;padding:24px';
-      d.innerHTML='<h2>Destino de recepción</h2><p>Selecciona almacén y zona conforme. Las cantidades y la cuarentena se revisan en el formulario.</p><label class="field">Almacén<select id="destinationWarehouseRC11"></select></label><label class="field">Zona<select id="destinationZoneRC11"></select></label><p id="destinationStatusRC11" role="status"></p><button class="button" id="destinationContinueRC11">Continuar</button> <button class="button secondary" id="destinationCancelRC11">Cancelar</button>';
-      document.body.appendChild(d);$('destinationCancelRC11').onclick=()=>d.close();
-      $('destinationWarehouseRC11').onchange=loadDestinationRC11;
+      d=document.createElement('dialog');d.id='receiptDestinationRC11';d.className='receipt-warehouse-dialog';d.setAttribute('aria-labelledby','receiptWarehouseTitleRC14');
+      d.innerHTML='<div class="receipt-warehouse-heading"><small>NUEVA RECEPCIÓN</small><h2 id="receiptWarehouseTitleRC14">Destino de recepción</h2><p>Selecciona la nave y la zona donde llega el material.</p></div><div class="receipt-warehouse-body"><label class="field"><span>Almacén</span><select id="destinationWarehouseRC11"></select></label><label class="field"><span>Zona de recepción</span><select id="destinationZoneRC11"></select></label><p id="destinationStatusRC11" role="status"></p></div><div class="receipt-warehouse-footer"><button type="button" class="button secondary" id="destinationCancelRC11">Cancelar</button><button type="button" class="button secondary" id="destinationRefreshRC14">Actualizar zonas</button><button type="button" class="button" id="destinationContinueRC11">Continuar</button></div>';
+      document.body.appendChild(d);d.addEventListener('cancel',e=>{if(d._applying)e.preventDefault();});
+      $('destinationCancelRC11').onclick=()=>{if(!d._applying)d.close();};
+      $('destinationWarehouseRC11').onchange=()=>loadDestinationRC11();
+      $('destinationRefreshRC14').onclick=()=>loadDestinationRC11(true);
       $('destinationContinueRC11').onclick=async()=>{
+        if(d._applying)return;
         const id=$('destinationWarehouseRC11').value,zone=$('destinationZoneRC11').value;
-        if(!id||!zone||!d._config?.canReceive)return;
-        $('destinationContinueRC11').disabled=true;
+        if(!id||!zone||!d._config?.canReceive||d._config.warehouseId!==id)return;
+        d._applying=true;
+        for(const key of ['destinationWarehouseRC11','destinationZoneRC11','destinationContinueRC11','destinationCancelRC11','destinationRefreshRC14'])$(key).disabled=true;
+        $('destinationContinueRC11').textContent='Abriendo recepción…';$('destinationStatusRC11').textContent='Cargando el formulario de esta nave…';
         try{
           if(id!==state.currentWarehouse?.id){$('warehouseSelector').value=id;await changeWarehouse();}
-          if(state.currentWarehouse?.id!==id||!state.canReceive)throw Error('No se ha podido seleccionar un destino autorizado.');
-          if(!(state.zones||[]).some(z=>z.CODIGO===zone&&z.AREA==='ALMACEN'))throw Error('La zona ya no está disponible.');
+          if(state.currentWarehouse?.id!==id||!state.canReceive)throw Error('No se ha podido abrir una recepción autorizada en esta nave.');
+          if(!(state.zones||[]).some(z=>z.CODIGO===zone&&z.AREA==='ALMACEN')||![...$('rZone').options].some(o=>o.value===zone))throw Error('La zona ya no está disponible. Actualiza las zonas y selecciona otra.');
           $('rZone').value=zone;receiptZoneHint();d.close();view('receipt',false);
-        }catch(e){$('destinationStatusRC11').textContent=e.message;}finally{$('destinationContinueRC11').disabled=false;}
+        }catch(e){$('destinationStatusRC11').textContent=e.message;}
+        finally{d._applying=false;for(const key of ['destinationWarehouseRC11','destinationZoneRC11','destinationCancelRC11','destinationRefreshRC14'])$(key).disabled=false;$('destinationContinueRC11').disabled=!$('destinationZoneRC11').value;$('destinationContinueRC11').textContent='Continuar';}
       };return d;
     }
-    async function loadDestinationRC11(){
-      const d=receiptDestinationDialogRC11(),id=$('destinationWarehouseRC11').value;
+    async function loadDestinationRC11(force=false){
+      const d=receiptDestinationDialogRC11();if(d._applying)return;
+      const id=$('destinationWarehouseRC11').value,previous=force?$('destinationZoneRC11').value:'';
       d._config=null;$('destinationZoneRC11').replaceChildren(new Option('Selecciona zona',''));$('destinationContinueRC11').disabled=true;
-      if(!id){$('destinationStatusRC11').textContent='Selecciona un almacén disponible; Nave 15 no se sustituye automáticamente por otra nave.';return;}
-      $('destinationStatusRC11').textContent='Comprobando zonas y permisos…';
+      if(!id){$('destinationStatusRC11').textContent='Selecciona una nave disponible.';return;}
+      $('destinationStatusRC11').textContent=force?'Actualizando zonas…':'Cargando zonas…';
       try{
-        const config=await call('bootstrap',{warehouseId:id});
-        if($('destinationWarehouseRC11').value!==id)return;
-        d._config=config;
-        if(!config.canReceive)throw Error('No tienes permiso de recepción en este almacén. Elige otro destino.');
-        (config.zones||[]).filter(z=>z.AREA==='ALMACEN').forEach(z=>$('destinationZoneRC11').add(new Option(z.NOMBRE+' · '+z.CODIGO,z.CODIGO)));
+        const catalog=await getReceiptCatalogRC14(force);if($('destinationWarehouseRC11').value!==id||!d.open)return;
+        const config=catalog.find(c=>c.warehouseId===id);d._config=config||null;
+        if(!config?.canReceive)throw Error('No tienes permiso de recepción en esta nave. Elige otra ubicación.');
+        (config.zones||[]).forEach(z=>$('destinationZoneRC11').add(new Option(z.name+' · '+z.code,z.code)));
+        if(previous&&[...$('destinationZoneRC11').options].some(o=>o.value===previous))$('destinationZoneRC11').value=previous;
         $('destinationZoneRC11').onchange=()=>{$('destinationContinueRC11').disabled=!$('destinationZoneRC11').value;};
-        $('destinationStatusRC11').textContent='Selecciona la zona de recepción.';
-      }catch(e){$('destinationStatusRC11').textContent=e.message;}
+        $('destinationContinueRC11').disabled=!$('destinationZoneRC11').value;
+        $('destinationStatusRC11').textContent=config.zones?.length?'Selecciona la zona de recepción.':'Esta nave no tiene zonas de recepción activas.';
+      }catch(e){if($('destinationWarehouseRC11').value===id)$('destinationStatusRC11').textContent=e.message;}
     }
     function openReceiptDestinationRC11(){
-      if(receiptSaving||pendingReceipt){status('Resuelve la recepción pendiente antes de cambiar su destino.','error');return;}
-      if(document.querySelectorAll('#receiptLines .line').length&&[...document.querySelectorAll('#receiptLines .receivedQty')].some(x=>x.value)&&!confirm('La recepción tiene cantidades sin guardar. ¿Elegir otro destino?'))return;
+      if(warehouseSwitching||receiptSaving||pendingReceipt){status('Espera a que termine la operación o resuelve la recepción pendiente.','info');return;}
+      if([...document.querySelectorAll('#receiptLines .receivedQty')].some(x=>x.value)&&!confirm('La recepción tiene cantidades sin guardar. ¿Elegir otro destino?'))return;
       const d=receiptDestinationDialogRC11(),select=$('destinationWarehouseRC11');
       select.replaceChildren(new Option('Selecciona almacén',''));(state.warehouses||[]).forEach(w=>select.add(new Option(w.name+' · '+w.id,w.id)));
       select.value=(state.warehouses||[]).some(w=>w.id==='HUE-MEC-N15')?'HUE-MEC-N15':'';d.showModal();loadDestinationRC11();
     }
+
     async function lookupQr(){
       const code=$('qrCode').value.trim();if(!code){status('Introduce o escanea una referencia o un lote.','error');return;}
       try{
@@ -1310,7 +1349,7 @@
       let acknowledged=false;
       try{
         if(!(await v116CheckPending()))return;
-        if(state.apiVersion!=='1.20-rc12')throw Error('Falta activar la versión RC12 del servidor Warehouse. Actualiza su implementación y recarga la página antes de registrar movimientos.');
+        if(!['1.20-rc12','1.20-rc14'].includes(state.apiVersion))throw Error('Actualiza la implementación del servidor Warehouse y recarga antes de registrar movimientos.');
         const mode=logisticsFlow==='INTERNAL'?'INTERNA':$('lMode').value;
         const originWarehouse=$('lOrigin').value,destinationWarehouse=mode==='INTERNA'?originWarehouse:$('lDestination').value;
         if(!originWarehouse||!destinationWarehouse||!logisticsCart.length)throw Error('Elige origen, destino y añade las unidades que vas a mover.');
@@ -1405,12 +1444,13 @@
     }
 
     async function signedIn(result){
-      credential=result.credential;
+      resetReceiptCatalogRC14();credential=result.credential;
       $('loginError').hidden=true;
 
       try{
         const initialWarehouse=deepLinkParams.get('warehouseId');
         state=await call('bootstrap',initialWarehouse?{warehouseId:initialWarehouse}:{});
+        rememberReceiptCatalogRC14(state.receiptDestinationsRC14);
 
         state.projectRules=state.projectRules||[];
         state.transfers=state.transfers||[];
@@ -1424,7 +1464,7 @@
         state.zoneMapSupported=Array.isArray(state.zoneMap);
         state.zoneMap=state.zoneMap||[];
 
-        let backendMismatch=state.apiVersion&&!['1.20-rc11','1.20-rc12'].includes(state.apiVersion);
+        let backendMismatch=state.apiVersion&&!['1.20-rc12','1.20-rc14'].includes(state.apiVersion);
 
         $('login').hidden=true;
         $('app').hidden=false;
@@ -1518,6 +1558,7 @@
       try{
         let result=await call('bootstrap',{warehouseId:id});
         state=Object.assign({},state,result);
+        rememberReceiptCatalogRC14(result.receiptDestinationsRC14);
         $('siteOrder').value='';
         state.siteMaterialRequests=state.siteMaterialRequests||[];
         state.siteOrders=state.siteOrders||[];
