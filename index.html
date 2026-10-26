@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14273b">
-  <meta name="levitec-frontend-release" content="rc8-20261025">
+  <meta name="levitec-frontend-release" content="rc8-20261026-zebra-75x50">
   <title>LEVITEC Warehouse · Producción</title>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#14273b;background:#f4f6f8;font-synthesis:none}
@@ -212,7 +212,7 @@
           <button type="button" class="button secondary" onclick="exportStock()">↓ &nbsp;Exportar CSV</button>
         </div>
         <p id="stockCount" class="count"></p>
-        <div class="table-wrap"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Ubicación</th><th class="right">Disponible</th></tr></thead><tbody id="stockRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Material</th><th>Referencia</th><th>Proyecto</th><th>Ubicación</th><th class="right">Disponible</th><th>Etiqueta</th></tr></thead><tbody id="stockRows"></tbody></table></div>
         <div id="stockEmpty" class="empty" hidden><b>Sin resultados</b>Ajusta los filtros o registra una recepción.</div>
       </div>
     </section>
@@ -468,11 +468,11 @@
       $('stockEmpty').hidden=rows.length>0;
       if($('stockView')?.value==='DETAIL'){
         $('stockCount').textContent=rows.length+' posiciones visibles';
-        $('stockRows').innerHTML=rows.map(x=>'<tr><td><strong>'+esc(x.description)+'</strong></td><td>'+esc(x.reference||'—')+'</td><td>'+esc(x.project)+'</td><td>'+esc((x.warehouseName||state.currentWarehouse?.name||'')+' · '+zoneLabel(x.zone))+'</td><td class="right">'+esc(x.quantity)+' '+esc(x.unit)+'</td></tr>').join('');return;
+        $('stockRows').innerHTML=rows.map(x=>'<tr><td><strong>'+esc(x.description)+'</strong></td><td>'+esc(x.reference||'—')+'</td><td>'+esc(x.project)+'</td><td>'+esc((x.warehouseName||state.currentWarehouse?.name||'')+' · '+zoneLabel(x.zone))+'</td><td class="right">'+esc(x.quantity)+' '+esc(x.unit)+'</td><td><button type="button" class="button secondary small" onclick="printStockLabelById('+JSON.stringify(String(x.materialId||x.reference||'')).replace(/"/g,'&quot;')+')">Imprimir etiqueta</button></td></tr>').join('');return;
       }
       const groups=new Map();rows.forEach(x=>{const key=x.materialId||x.reference;let g=groups.get(key);if(!g){g={...x,total:0,positions:[]};groups.set(key,g)}g.total+=Number(x.quantity);g.positions.push(x)});
       $('stockCount').textContent=groups.size+' referencias · '+rows.length+' posiciones';
-      $('stockRows').innerHTML=[...groups.values()].map(g=>'<tr><td><details><summary><strong>'+esc(g.description)+'</strong> · '+g.positions.length+' ubicaciones</summary><div style="padding:8px 0">'+g.positions.map(x=>'<div>'+esc((x.warehouseName||state.currentWarehouse?.name||'')+' / '+zoneLabel(x.zone)+' · '+x.project+' — '+x.quantity+' '+x.unit)+'</div>').join('')+'</div></details></td><td>'+esc(g.reference||'—')+'</td><td>'+esc([...new Set(g.positions.map(x=>x.project).filter(Boolean))].length===1?g.positions[0].project:'Varios / desglose')+'</td><td>'+g.positions.length+' posiciones</td><td class="right"><strong>'+Math.round(g.total*1000)/1000+' '+esc(g.unit)+'</strong></td></tr>').join('');
+      $('stockRows').innerHTML=[...groups.values()].map(g=>'<tr><td><details><summary><strong>'+esc(g.description)+'</strong> · '+g.positions.length+' ubicaciones</summary><div style="padding:8px 0">'+g.positions.map(x=>'<div>'+esc((x.warehouseName||state.currentWarehouse?.name||'')+' / '+zoneLabel(x.zone)+' · '+x.project+' — '+x.quantity+' '+x.unit)+'</div>').join('')+'</div></details></td><td>'+esc(g.reference||'—')+'</td><td>'+esc([...new Set(g.positions.map(x=>x.project).filter(Boolean))].length===1?g.positions[0].project:'Varios / desglose')+'</td><td>'+g.positions.length+' posiciones</td><td class="right"><strong>'+Math.round(g.total*1000)/1000+' '+esc(g.unit)+'</strong></td><td><button type="button" class="button secondary small" onclick="printStockLabelById('+JSON.stringify(String(g.materialId||g.reference||'')).replace(/"/g,'&quot;')+')">Imprimir etiqueta</button></td></tr>').join('');
     }
 
     const SVG_NS='http://www.w3.org/2000/svg';
@@ -991,7 +991,44 @@
       return {material,stock};
     }
 
-    function printLabels(labels){let w=window.open('','_blank');if(!w){status('Permite ventanas emergentes para imprimir etiquetas.','error');return}let cards=labels.map(l=>{let isQ=l.type==='CUARENTENA',code=isQ?'CELLARIQ:Q:'+l.lotId:'CELLARIQ:MAT:'+l.reference,qr='https://quickchart.io/qr?size=220&text='+encodeURIComponent(code);return '<div class="label '+(isQ?'q':'')+'"><img src="'+qr+'"><div>'+(isQ?'<div class="flag">CUARENTENA</div>':'')+'<h2>'+esc(l.reference)+'</h2><p>'+esc(l.description)+'</p>'+(l.manufacturer?'<p>'+esc(l.manufacturer)+'</p>':'')+(isQ?'<b>'+esc(l.quantity)+' '+esc(l.unit)+' · '+esc(l.project)+'</b><p>'+esc(l.zone)+' · '+esc(l.reason||'Pendiente de revisión')+'</p><small>'+esc(l.lotId)+'</small>':'<small>QR MATERIAL · '+esc(l.reference)+'</small>')+'</div></div>'}).join('');w.document.write('<!doctype html><meta charset="utf-8"><title>Etiquetas CellarIQ</title><style>@page{size:A4;margin:10mm}body{font-family:Arial}.label{break-inside:avoid;display:grid;grid-template-columns:42mm 1fr;gap:6mm;border:1px solid #222;padding:6mm;margin:0 0 6mm}.label.q{border:3px solid #b66c00;background:#fff8e8}.label img{width:38mm;height:38mm}.label h2{margin:0 0 3mm;font-size:18pt}.label p{margin:2mm 0}.label small{font-family:monospace}.flag{font-weight:900;font-size:16pt;letter-spacing:.08em;margin-bottom:2mm}</style>'+cards+'<script>window.onload=()=>window.print()<\/script>');w.document.close()}
+    // Impresión de una etiqueta desde Existencias. No ejecuta acciones del backend ni modifica stock.
+    function printStockLabelById(materialKey){
+      const row=(lastVisibleStock||[]).find(x=>String(x.materialId||x.reference||'')===String(materialKey));
+      if(!row){status('No se encuentra el material en las existencias visibles. Actualiza y vuelve a intentarlo.','error');return}
+      const reference=String(row.reference||'').trim();
+      if(!reference){status('El material no tiene referencia; no es posible generar su QR.','error');return}
+      printLabels([{type:'MATERIAL',reference,description:String(row.description||''),manufacturer:String(row.manufacturer||'')}]);
+    }
+
+    function printLabels(labels){
+      if(!Array.isArray(labels)||!labels.length){status('No hay etiquetas para imprimir.','error');return}
+      const w=window.open('','_blank');
+      if(!w){status('Permite ventanas emergentes para imprimir etiquetas.','error');return}
+      const cards=labels.map(l=>{
+        const isQ=l.type==='CUARENTENA';
+        const code=isQ?'CELLARIQ:Q:'+l.lotId:'CELLARIQ:MAT:'+l.reference;
+        const qr='https://quickchart.io/qr?size=240&margin=0&text='+encodeURIComponent(code);
+        return '<section class="label '+(isQ?'q':'')+'"><div class="qr"><img alt="QR" src="'+qr+'"></div><div class="info">'+
+          (isQ?'<div class="flag">CUARENTENA</div>':'<div class="eyebrow">LEVITEC · WAREHOUSE</div>')+
+          '<div class="reference">'+esc(l.reference)+'</div><div class="description">'+esc(l.description)+'</div>'+
+          (l.manufacturer?'<div class="manufacturer">'+esc(l.manufacturer)+'</div>':'')+
+          (isQ?'<div class="details">'+esc(l.quantity)+' '+esc(l.unit)+' · '+esc(l.project)+'</div><div class="details">'+esc(l.zone)+' · '+esc(l.reason||'Pendiente de revisión')+'</div><div class="foot">'+esc(l.lotId)+'</div>':'<div class="foot">QR MATERIAL · '+esc(l.reference)+'</div>')+
+          '</div></section>';
+      }).join('');
+      const css=`@page{size:75mm 50mm;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:white;color:#111;font-family:Arial,Helvetica,sans-serif}section.label{width:75mm;height:50mm;padding:2.5mm;display:grid;grid-template-columns:25mm minmax(0,1fr);gap:2mm;overflow:hidden;break-after:page;page-break-after:always;align-items:center}section.label:last-child{break-after:auto;page-break-after:auto}.qr{width:25mm;height:25mm;display:flex;align-items:center;justify-content:center}.qr img{display:block;width:25mm;height:25mm;object-fit:contain}.info{height:44mm;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden}.eyebrow{font-size:6pt;font-weight:700;letter-spacing:.04em;color:#444;margin-bottom:1.2mm}.reference{font-size:11pt;font-weight:800;overflow-wrap:anywhere;line-height:1.08;margin-bottom:1.4mm}.description{font-size:8pt;font-weight:600;line-height:1.15;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.manufacturer{font-size:6.5pt;margin-top:1.3mm;overflow-wrap:anywhere}.foot{font-size:5.5pt;margin-top:2mm;overflow-wrap:anywhere}.flag{font-size:9pt;font-weight:900;color:#8a3300;margin-bottom:1mm}.details{font-size:6.5pt;margin-top:1mm;overflow-wrap:anywhere}.q{outline:1mm solid #a54b00;outline-offset:-1mm}@media screen{body{background:#e9edf0;padding:10mm}section.label{background:white;margin:0 auto 6mm;box-shadow:0 2px 12px #0002}}@media print{body{background:white;padding:0}section.label{margin:0;box-shadow:none}}`;
+      w.document.open();
+      w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Etiquetas LEVITEC 75×50 mm</title><style>'+css+'</style></head><body>'+cards+'</body></html>');
+      w.document.close();
+      // Esperar a que se carguen los QR; evitar etiquetas sin código por impresión prematura.
+      const ready=()=>{
+        const images=Array.from(w.document.images);
+        Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve}))).then(()=>{
+          if(images.some(img=>!img.naturalWidth)){w.alert('No se han podido cargar todos los QR. Comprueba la conexión antes de imprimir.');return}
+          w.focus();w.print();
+        });
+      };
+      if(w.document.readyState==='complete')ready();else w.addEventListener('load',ready,{once:true});
+    }
     async function lookupQr(){let code=$('qrCode').value.trim();if(!code){status('Introduce o escanea una referencia de material.','error');return}try{await refresh();let r;try{r=await call('getMaterialByQr',{code})}catch(apiError){if(!/Acción no válida/i.test(String(apiError&&apiError.message||apiError)))throw apiError;r=materialQrSummaryLocally(code);status('El frontend está actualizado pero el backend desplegado es anterior. He localizado el material localmente; vuelve a desplegar LEVITEC Warehouse v1.0 para dejar ambas versiones sincronizadas.','info')}
       let material=r.material,stock=r.stock||[],warehouse=stock.filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0),quarantine=stock.filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0);if(!warehouse.length)throw Error('La referencia existe, pero no tiene stock disponible en almacén. Cuarentena: '+quarantine.reduce((sum,x)=>sum+Number(x.quantity),0)+' '+material.UNIDAD+'.');let byZone={};warehouse.forEach(x=>byZone[x.zone]=(byZone[x.zone]||0)+Number(x.quantity));let zones=Object.entries(byZone).sort((a,b)=>b[1]-a[1]),preferred=zones[0][0];view('transfer',false);if([...$('mOrigin').options].some(o=>o.value===preferred))$('mOrigin').value=preferred;available();if([...$('mMaterial').options].some(o=>o.value===material.ID))$('mMaterial').value=material.ID;scannedMaterialRef=material.REFERENCIA;renderMoveSummary();let total=warehouse.reduce((sum,x)=>sum+Number(x.quantity),0),qtotal=quarantine.reduce((sum,x)=>sum+Number(x.quantity),0),zoneText=zones.map(([z,q])=>z+' '+q+' '+material.UNIDAD).join(' · ');status('Material localizado: '+material.REFERENCIA+' · '+material.DESCRIPCION+' · disponible '+total+' '+material.UNIDAD+(qtotal?' · cuarentena '+qtotal+' '+material.UNIDAD:'')+' · '+zoneText,'success')}catch(e){fail(e)}}
     async function scanQr(forLogistics=false){if(!window.Html5Qrcode){status('El lector QR no se ha cargado. Puedes escribir la referencia manualmente.','error');return}let overlay=$('qrScanner');overlay.hidden=false;overlay.style.display='grid';$('qrScannerStatus').textContent='Solicitando acceso a la cámara…';try{qrScannerInstance=new Html5Qrcode('qrReader');await qrScannerInstance.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250},aspectRatio:1.0},async decoded=>{await stopQrScanner();if(forLogistics)await logisticsQrScanned(decoded);else{$('qrCode').value=decoded;await lookupQr()}},()=>{});$('qrScannerStatus').textContent='Apunta al QR del material. Mantén la etiqueta dentro del recuadro.'}catch(e){await stopQrScanner();status('No se pudo abrir la cámara. Revisa el permiso de cámara en Safari o introduce la referencia manualmente. '+(e&&e.message?e.message:''),'error')}}
