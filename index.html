@@ -212,11 +212,34 @@
     .login-card .eyebrow{display:inline-block;background:#000000;color:#ffffff;border-radius:999px;padding:6px 12px;letter-spacing:.11em;margin-bottom:18px}
     .login-card .login-icon{width:48px;height:48px;padding:0;background:#000000;border-radius:12px;overflow:hidden;display:grid;place-items:center}
     .login-card .login-icon img{display:block;width:100%;height:100%;object-fit:contain}
-</style>
+
+    /* RC17 · Pantalla de acceso y cabecera alineadas con LEVITEC Site Control.
+       Reglas restringidas al acceso para no alterar módulos operativos. */
+    .topbar{min-height:72px;border-bottom:1px solid #202020}
+    .topbar-inner{max-width:none;width:100%;padding:12px 3vw;min-height:72px}
+    .topbar .brand{gap:12px}
+    .topbar .brand-mark{width:42px;height:42px;flex:none;border-radius:9px}
+    .topbar .brand strong{display:block;color:#fff;font-size:16px;font-weight:900;letter-spacing:0;line-height:1.2}
+    .topbar .brand small{display:block;color:#c8c8c8;font-size:11px;letter-spacing:0;font-weight:400;text-transform:none;margin-top:4px;margin-bottom:0;line-height:1.2}
+    body:has(#login:not([hidden])) .login-wrap{min-height:70vh;min-height:calc(100dvh - 72px);padding:32px 18px;display:grid;place-items:center}
+    #login .login-card{width:min(500px,100%);padding:38px;background:#fff;border:1px solid #d9e3e9;border-radius:20px;box-shadow:0 12px 32px rgba(16,36,55,.08)}
+    #login .login-card .eyebrow{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:6px 10px;margin:0;background:#000;color:#fff;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.08em;line-height:1.2;text-transform:uppercase}
+    #login .login-card h1{margin:15px 0 9px;font-size:42px;line-height:1.12;font-weight:800;letter-spacing:-.035em;color:#102437}
+    #login .login-card > p:not(.eyebrow){margin:0 0 15px;color:#64798a;font-size:14px;line-height:1.5}
+    @media(max-width:760px){
+      .topbar-inner{padding:10px 12px;min-height:64px}
+      .topbar .brand-mark{width:34px;height:34px}
+      .topbar .brand strong{font-size:clamp(12px,3.8vw,16px)}
+      .topbar .brand small{font-size:10px}
+      body:has(#login:not([hidden])) .login-wrap{min-height:calc(100dvh - 64px);padding:24px 16px}
+      #login .login-card{padding:24px 20px}
+      #login .login-card h1{font-size:clamp(28px,8vw,36px)}
+    }
+  </style>
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner">
-    <div class="brand"><img class="brand-mark" src="./icon-192.png" alt="" aria-hidden="true"><div><small>LEVITEC · WAREHOUSE</small><strong>Warehouse</strong></div></div>
+    <div class="brand"><img class="brand-mark" src="./icon-192.png" alt="LEVITEC Warehouse"><div><strong>LEVITEC WAREHOUSE</strong><small>Digital Warehouse Management</small></div></div>
     <div id="identity" class="identity" hidden>
   <div class="warehouse-switch">
     <label for="warehouseSelector">Ubicación logística</label>
@@ -225,7 +248,7 @@
   <div><b id="userName"></b><span id="userRole"></span><small id="warehouseIdentity"></small></div>
 </div>
   </div></header>
-  <div id="login" class="login-wrap"><section class="card login-card"><div class="login-icon" aria-hidden="true"><img src="./icon-192.png" alt="" width="48" height="48"></div><p class="eyebrow">Control de materiales</p><h1>Todo el material, bajo control.</h1><p>Consulta existencias, registra entradas y sigue los traslados entre almacén y obra.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
+  <div id="login" class="login-wrap"><section class="card login-card"><p class="eyebrow">WAREHOUSE</p><h1>Gestión operativa de almacén</h1><p>Controla existencias, registra recepciones y gestiona los movimientos de material entre almacenes y obras.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
   <main id="app" class="layout" hidden>
     <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" onclick="refresh(true)" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
     <nav class="tabs" aria-label="Secciones">
