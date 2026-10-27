@@ -2,9 +2,9 @@
 {
   "name": "LEVITEC Warehouse",
   "short_name": "Warehouse",
-  "id": "/levitec-warehouse/",
-  "start_url": "/levitec-warehouse/",
-  "scope": "/levitec-warehouse/",
+  "id": "/levitec-almacen-obra/",
+  "start_url": "/levitec-almacen-obra/",
+  "scope": "/levitec-almacen-obra/"
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#11263B",
