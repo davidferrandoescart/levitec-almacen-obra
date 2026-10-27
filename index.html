@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#14273b">
+  <meta name="theme-color" content="#000000">
   <meta name="levitec-frontend-release" content="rc14-20261026-zonas-movil">
   <title>LEVITEC Warehouse · Producción</title>
   
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="LEVITEC Warehouse">
 
   <style>
@@ -201,11 +201,22 @@
  .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;overflow:visible}.tab{min-width:0;white-space:normal;font-size:12px;padding:9px 4px;border-bottom-width:2px}
 }
 
+
+    /* LEVITEC WAREHOUSE · IDENTIDAD VISUAL CORPORATIVA */
+    .topbar{background:#000000;border-bottom:3px solid #000000;color:#ffffff}
+    .topbar .brand strong{color:#ffffff}
+    .topbar .brand small{color:#d3d3d3}
+    .topbar .identity,.topbar .identity b{color:#ffffff}
+    .topbar .identity small,.topbar .warehouse-switch label{color:#c8c8c8}
+    .topbar .brand-mark{display:block;flex:none;width:42px;height:42px;padding:0;border-radius:10px;background:#000000;object-fit:contain}
+    .login-card .eyebrow{display:inline-block;background:#000000;color:#ffffff;border-radius:999px;padding:6px 12px;letter-spacing:.11em;margin-bottom:18px}
+    .login-card .login-icon{width:48px;height:48px;padding:0;background:#000000;border-radius:12px;overflow:hidden;display:grid;place-items:center}
+    .login-card .login-icon img{display:block;width:100%;height:100%;object-fit:contain}
 </style>
 </head>
 <body>
   <header class="topbar"><div class="topbar-inner">
-    <div class="brand"><div class="brand-mark" aria-hidden="true">L</div><div><small>LEVITEC · SITE CONTROL</small><strong>Warehouse</strong></div></div>
+    <div class="brand"><img class="brand-mark" src="./icon-192.png" alt="" aria-hidden="true"><div><small>LEVITEC · WAREHOUSE</small><strong>Warehouse</strong></div></div>
     <div id="identity" class="identity" hidden>
   <div class="warehouse-switch">
     <label for="warehouseSelector">Ubicación logística</label>
@@ -214,7 +225,7 @@
   <div><b id="userName"></b><span id="userRole"></span><small id="warehouseIdentity"></small></div>
 </div>
   </div></header>
-  <div id="login" class="login-wrap"><section class="card login-card"><div class="login-icon" aria-hidden="true">▣</div><p class="eyebrow">Control de materiales</p><h1>Todo el material, bajo control.</h1><p>Consulta existencias, registra entradas y sigue los traslados entre almacén y obra.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
+  <div id="login" class="login-wrap"><section class="card login-card"><div class="login-icon" aria-hidden="true"><img src="./icon-192.png" alt="" width="48" height="48"></div><p class="eyebrow">Control de materiales</p><h1>Todo el material, bajo control.</h1><p>Consulta existencias, registra entradas y sigue los traslados entre almacén y obra.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
   <main id="app" class="layout" hidden>
     <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" onclick="refresh(true)" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
     <nav class="tabs" aria-label="Secciones">
