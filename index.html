@@ -224,7 +224,7 @@
     body:has(#login:not([hidden])) .login-wrap{min-height:70vh;min-height:calc(100dvh - 72px);padding:32px 18px;display:grid;place-items:center}
     #login .login-card{width:min(500px,100%);padding:38px;background:#fff;border:1px solid #d9e3e9;border-radius:20px;box-shadow:0 12px 32px rgba(16,36,55,.08)}
     #login .login-card .eyebrow{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:6px 10px;margin:0;background:#000;color:#fff;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.08em;line-height:1.2;text-transform:uppercase}
-    #login .login-card h1{margin:15px 0 9px;font-size:42px;line-height:1.12;font-weight:800;letter-spacing:-.035em;color:#102437}
+    #login .login-card h1{margin:15px 0 9px;font-size:40px;line-height:1.16;font-weight:700;letter-spacing:-.018em;color:#102437}
     #login .login-card > p:not(.eyebrow){margin:0 0 15px;color:#64798a;font-size:14px;line-height:1.5}
     @media(max-width:760px){
       .topbar-inner{padding:10px 12px;min-height:64px}
@@ -235,6 +235,67 @@
       #login .login-card{padding:24px 20px}
       #login .login-card h1{font-size:clamp(28px,8vw,36px)}
     }
+  
+    /* RC18 · Acceso Warehouse: valores tipográficos y espaciales de Site Control.
+       Solo afecta al inicio de sesión; no modifica pantallas operativas. */
+    #login.login-wrap {
+      min-height: 70vh;
+      min-height: calc(100dvh - 72px);
+      padding: 22px;
+      display: grid;
+      place-items: center;
+    }
+    #login .login-card {
+      width: min(500px, 100%);
+      padding: 38px;
+      border: 1px solid #d9e3e9;
+      border-radius: 20px;
+      box-shadow: 0 12px 32px rgba(16,36,55,.08);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      font-synthesis: weight;
+    }
+    #login .login-card .eyebrow {
+      display: inline-flex;
+      width: auto;
+      max-width: 100%;
+      margin: 0;
+      padding: 6px 10px;
+      background: #000;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      line-height: normal;
+      border-radius: 999px;
+    }
+    #login .login-card h1 {
+      margin: 15px 0 9px;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      font-size: 42px;
+      font-weight: 700;
+      font-synthesis: weight;
+      line-height: normal;
+      letter-spacing: normal;
+      color: #102437;
+    }
+    #login .login-card > p:not(.eyebrow) {
+      margin: 0 0 15px;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      letter-spacing: normal;
+      color: #64798a;
+    }
+    /* Evitar desplazamiento vertical artificial en la pantalla de acceso.
+       El contenido puede desplazarse normalmente en pantallas pequeñas. */
+    body:has(#login:not([hidden])) { min-height: 100dvh; }
+    @media (max-width: 760px) {
+      #login.login-wrap { min-height: calc(100dvh - 64px); padding: 24px 16px; }
+      #login .login-card { width: 100%; min-width: 0; padding: 24px 20px; }
+      #login .login-card h1 { font-size: clamp(28px, 8vw, 36px); line-height: 1.12; }
+    }
+
   </style>
 </head>
 <body>
