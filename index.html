@@ -2,9 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-elem 'self' 'sha256-DRbB4dzPWPJcKxM15k198Je1j4O+K9yCpn/cWL/EbO8=' 'sha256-ihwymJXpIMbYK3nWrkC/41GRiUXzv8NZyr0KPDqrZV8=' 'sha256-MfF2/0uUAiup5a2C1H3xo4O8ClMGHFe8dmBSHdfGKt0=' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://quickchart.io https://*.googleusercontent.com; connect-src 'self' https://accounts.google.com https://*.googleapis.com; frame-src https://accounts.google.com https://script.google.com https://*.googleusercontent.com; form-action https://script.google.com https://*.googleusercontent.com; object-src 'none'; base-uri 'none'; worker-src 'self' blob:; media-src 'self' blob:">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
-  <meta name="levitec-frontend-release" content="audit-hotfix-20261031.3">
+  <meta name="levitec-frontend-release" content="audit-hotfix-20261031.4">
   <title>LEVITEC Warehouse · Producción</title>
   
 <link rel="icon" href="./favicon.ico" sizes="any">
@@ -495,6 +497,8 @@
     </section>
     <div id="qrScanner" hidden style="position:fixed;inset:0;background:#000d;z-index:50;display:grid;place-items:center;padding:20px"><div style="width:min(100%,520px);background:#fff;border-radius:14px;padding:16px"><div class="panel-top"><div><h3>Escanear material</h3><p>Apunta al QR de la referencia.</p></div><button class="button secondary small" onclick="stopQrScanner()">Cerrar</button></div><div id="qrReader" style="width:100%;overflow:hidden;border-radius:10px;background:#111"></div><p id="qrScannerStatus" class="intro">Preparando cámara…</p></div></div>
     <footer>LEVITEC Warehouse · Trazabilidad por almacén, proyecto y ubicación.</footer>
+    <section class="panel" id="historyHF4" style="margin-top:20px;padding:18px"><h2>Histórico completo del almacén seleccionado</h2><p>Los pendientes se mantienen visibles por antigüedad. Consulta aquí las páginas anteriores del histórico.</p><label>Tipo de registro <select id="historyKindHF4"><option value="movements">Movimientos</option><option value="logistics">Operaciones logísticas</option><option value="receiptIncidents">Incidencias</option><option value="transferRequests">Solicitudes protegidas</option><option value="transfers">Traspasos</option><option value="lots">Lotes</option></select></label><button type="button" class="button secondary" id="historyLoadHF4">Consultar página siguiente</button><p id="historyStatusHF4"></p><div id="historyRowsHF4"></div></section>
+    <dialog id="reconcileDialogHF4"><form id="reconcileFormHF4"><h2>Conciliar incidencia</h2><p id="reconcileInfoHF4"></p><p>Esta decisión administrativa aplica cantidades ya liberadas por Calidad al pedido. No genera una entrada ni una salida física.</p><label>Cantidad adicional a aplicar <input id="reconcileQtyHF4" type="number" min="0" step="0.001" value="0" required></label><label><input id="reconcileSubHF4" type="checkbox"> Acepto comercialmente la referencia sustitutiva, si corresponde</label><label><input id="reconcileCloseHF4" type="checkbox"> Cerrar la incidencia documental con esta decisión</label><label>Motivo y evidencia de aceptación <textarea id="reconcileReasonHF4" maxlength="500" required></textarea></label><button type="submit" class="button">Registrar conciliación administrativa</button><button type="button" class="button secondary" id="reconcileCancelHF4">Cancelar</button></form></dialog>
   </main>
   <script>
     const CLIENT_ID='847207312341-vatimdqe1f83fiji9cu7a27cslbio0t7.apps.googleusercontent.com';
@@ -596,10 +600,10 @@
     function zoneLabel(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return code;let wh=state.currentWarehouse?.id||'';let m=wh.match(/-N(\d+)$/);return (m?'N'+m[1]+' - ':'')+(z.NOMBRE||code)}
     async function loadStockScope(){
       if($('stockScope').value==='GLOBAL'){
-        try{status('Consultando inventario global…','info');const r=await call('globalStock',{});state.globalStock=r.stock||[];state.globalStockIssuesHF3=r.stockIssuesHF3||[];renderStockIssuesHF3();status('Inventario global actualizado.','success')}
+        try{status('Consultando inventario global…','info');const r=await call('globalStock',{});state.globalStock=r.stock||[];state.globalStockIssuesHF3=r.stockIssuesHF3||[];renderStockIssuesHF3();renderSummary();status('Inventario global actualizado.','success')}
         catch(e){fail(e);$('stockScope').value='LOCAL';}
       }
-      renderStock();renderStockIssuesHF3();
+      renderStock();renderStockIssuesHF3();renderSummary();
     }
     const expandedStockRC13=new Set();
     function stockPositionRC13(x){
@@ -895,7 +899,7 @@
       finally{actionBusy=false}
     }
     async function resolveTransferApproval(id,decision){if(actionBusy)return;if(!confirm((decision==='APROBAR'?'¿Autorizar':'¿Rechazar')+' esta solicitud de uso de stock protegido?'))return;actionBusy=true;try{await call('resolveTransferRequest',{requestId:id,decision});await afterSave(decision==='APROBAR'?'Solicitud autorizada y movimiento registrado.':'Solicitud rechazada.','notifications')}catch(e){fail(e)}finally{actionBusy=false}}
-    function renderSummary(){let stock=availableStock(),ids=new Set(stock.map(x=>x.materialId)),zones=new Set(stock.map(x=>x.zone)),projects=new Set(stock.map(x=>x.project)),batches=new Set(pendingEvents().map(x=>x.ID_LOTE));
+    function renderSummary(){let stock=$('stockScope')?.value==='GLOBAL'?(state.globalStock||[]):availableStock(),ids=new Set(stock.map(x=>x.materialId)),zones=new Set(stock.map(x=>(x.warehouseId||state.currentWarehouse?.id||'')+'|'+x.zone)),projects=new Set(stock.map(x=>x.project)),batches=new Set(pendingEvents().map(x=>x.ID_LOTE));
       $('statReferences').textContent=ids.size;$('statZones').textContent=zones.size;$('statProjects').textContent=projects.size;$('statPending').textContent=batches.size;
       $('navPending').textContent=batches.size?'· '+batches.size:'';$('navNotifications').textContent=batches.size?'· '+batches.size:'';$('transitNote').hidden=batches.size===0;renderNotifications()}
     function available(){let origin=$('mOrigin').value,items=physicalMaterials(origin);
@@ -1102,11 +1106,12 @@
     async function afterSave(message,target){status(message);try{await refresh()}catch(e){status(message+' No se han podido actualizar las listas: pulsa Actualizar.','info')}view(target,false)}
     function renderReceiptIncidents(){
       const box=$('receiptIncidentsSummary');if(!box)return;
-      const rows=(state.receiptIncidents||[]).filter(x=>x.ESTADO==='ABIERTA');
+      const rows=(state.receiptIncidents||[]).filter(x=>!['CERRADA','RESUELTA'].includes(x.ESTADO));
       box.hidden=!rows.length;
       if(!rows.length)return;
-      const items=rows.slice(0,12).map(x=>'<li><b>'+esc(x.INCIDENCIA_ID)+'</b> · '+esc(x.REFERENCIA_RECIBIDA||'')+' · '+esc(x.TIPO||'')+' · '+esc(x.ALBARAN||'')+'</li>').join('');
-      box.innerHTML='<strong>'+rows.length+' incidencia(s) abiertas en este almacén</strong><p>Material en cuarentena: resolver desde Cuarentena con autorización de Calidad. La incidencia documental permanecerá abierta hasta su conciliación administrativa.</p><ul>'+items+'</ul>';
+      const items=rows.map(x=>'<li><b>'+esc(x.INCIDENCIA_ID)+'</b> · '+esc(x.REFERENCIA_RECIBIDA||'')+' · '+esc(x.TIPO||'')+' · '+esc(x.ALBARAN||'')+(state.user?.role==='ADMIN'?'<button type="button" class="button secondary" data-reconcile-id="'+esc(x.INCIDENCIA_ID)+'">Conciliar incidencia</button>':'')+'</li>').join('');
+      box.innerHTML='<strong>'+rows.length+' incidencia(s) abiertas en este almacén</strong><p>La resolución física de Calidad y la aplicación comercial al pedido son decisiones separadas. La conciliación administrativa no mueve existencias.</p><ul>'+items+'</ul>';
+      box.querySelectorAll('[data-reconcile-id]').forEach(b=>b.onclick=()=>openReconcileHF4(b.dataset.reconcileId));
     }
     async function saveReceipt(){
       if(receiptSaving)return;let p;try{p=receiptData();}catch(e){fail(e);return;}
@@ -1562,8 +1567,9 @@
     }
 
     async function signedIn(result){
-      resetReceiptCatalogRC14();credential=result.credential;serverPendingHF3=[];renderRecoveryHF3();
+      resetReceiptCatalogRC14();credential=result.credential;serverPendingHF3=[];serverOperationsHF4=[];renderRecoveryHF3();
       try{serverPendingHF3=(await callTransportHF3('pendingReceiptsHF3',{})).receipts||[];}catch(_){}
+      try{serverOperationsHF4=(await callTransportHF3('pendingOperationsHF4',{})).operations||[];}catch(_){}
       renderRecoveryHF3();
       $('loginError').hidden=true;
 
@@ -1723,8 +1729,8 @@
     }
   </script>
   <script>
-const RECOVERY_ACTIONS_HF3=new Set(['createReceipt','moveStock','resolveQuarantine','submitOperationRC12','requestProtectedTransfer']);
-let serverPendingHF3=[],recoveryWarehouseHF3='';
+const RECOVERY_ACTIONS_HF3=new Set(['createReceipt','moveStock','resolveQuarantine','submitOperationRC12','requestProtectedTransfer','confirmCamp','confirmDestination','cancelMove','releaseQuarantine','saveZoneMap','compensateProjectTransfer','resolveTransferRequest','saveMaterialPolicy','resolveSiteMaterialRequest','createLogistics','internalLogisticsBatch','dispatchLogistics','approveLogistics','receiveLogistics','cancelLogistics','reconcileIncidentHF4']);
+let serverPendingHF3=[],serverOperationsHF4=[],recoveryWarehouseHF3='';
 function recoveryOwnerHF3(){
   if(!credential)return '';
   try{const part=credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return String(JSON.parse(atob(part)).sub||'');}catch(_){return '';}
@@ -1764,6 +1770,7 @@ async function executeSavedHF3(key,record){
 function call(action,data={}){
   if(!RECOVERY_ACTIONS_HF3.has(action))return callTransportHF3(action,data);
   const payload=cleanIntentHF3({...data,warehouseId:data.warehouseId||state.currentWarehouse?.id});
+  if(!payload.batchId&&!payload.clientId)payload.batchId='CLIENT-'+crypto.randomUUID();
   return withRecoveryLockHF3(async key=>{
     let record=readPendingHF3(key);const id=String(payload.batchId||payload.clientId||'');
     if(!/^[a-zA-Z0-9_-]{8,100}$/.test(id))throw Error('No se ha podido identificar la operación. No se ha enviado.');
@@ -1783,10 +1790,12 @@ function renderRecoveryHF3(){
   if(!credential){box.hidden=true;return;}
   let record;try{record=readPendingHF3();}catch(e){box.hidden=false;box.textContent=e.message;return;}
   const labels={createReceipt:'recepción',moveStock:'movimiento',resolveQuarantine:'resolución de cuarentena',submitOperationRC12:'operación logística',requestProtectedTransfer:'solicitud de autorización'};
-  box.hidden=!record&&!serverPendingHF3.length;if(box.hidden){box.replaceChildren();return;}
+  box.hidden=!record&&!serverPendingHF3.length&&!serverOperationsHF4.length;if(box.hidden){box.replaceChildren();return;}
   box.innerHTML='<h2>Operación pendiente de confirmar</h2><p>Reanuda el mismo envío guardado antes de registrar otra operación. No se creará un identificador nuevo.</p>'+
-    (record?'<p><strong>'+esc(labels[record.action])+'</strong> · '+esc(record.data.warehouseId||'')+'<br><small>Código: '+esc(record.id)+'</small></p>'+(record.lastMessage?'<p>'+esc(record.lastMessage)+'</p>':'')+'<button class="button" type="button" id="resumeLocalHF3">Reintentar envío guardado</button>':'')+
+    (record?'<p><strong>'+esc(labels[record.action]||'operación')+'</strong> · '+esc(record.data.warehouseId||'')+'<br><small>Código: '+esc(record.id)+'</small></p>'+(record.lastMessage?'<p>'+esc(record.lastMessage)+'</p>':'')+'<button class="button" type="button" id="resumeLocalHF3">Reintentar envío guardado</button>':'')+
+    serverOperationsHF4.map((r,i)=>'<div class="spacer"><p>Operación pendiente en '+esc(r.warehouseId)+' · '+esc(r.action)+'</p>'+(r.recoverable?'<button class="button secondary" type="button" data-operation-resume="'+i+'">Completar operación guardada</button>':'<p>Plan incompleto: requiere restauración o conciliación supervisada.</p>')+'</div>').join('')+
     serverPendingHF3.map((r,i)=>'<div class="spacer"><p>Recepción sin completar en '+esc(r.warehouseId)+'<br><small>'+esc(r.batchId)+'</small></p>'+(r.recoverable?'<button class="button secondary" type="button" data-resume-server="'+i+'">Completar recepción guardada</button>':'<p>El plan está incompleto y requiere conciliación antes de continuar.</p>')+'</div>').join('');
+  box.querySelectorAll('[data-operation-resume]').forEach(button=>button.onclick=()=>resumeOperationClientHF4(Number(button.dataset.operationResume)));
   const local=document.getElementById('resumeLocalHF3');if(local)local.onclick=resumeLocalHF3;
   box.querySelectorAll('[data-resume-server]').forEach(button=>button.onclick=()=>resumeServerHF3(Number(button.dataset.resumeServer)));
 }
@@ -1818,7 +1827,20 @@ function renderStockIssuesHF3(){
 window.addEventListener('storage',e=>{if(e.key===recoveryKeyHF3())renderRecoveryHF3();});
 
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+let reconcileIncidentIdHF4='',historyOffsetsHF4={};
+async function resumeOperationClientHF4(index){
+ if(actionBusy||receiptSaving||moveSaving)return;const entry=serverOperationsHF4[index];if(!entry||!confirm('¿Completar la operación guardada en '+entry.warehouseId+'? Se comprobarán los registros antes de escribir.'))return;
+ actionBusy=true;try{const result=await withRecoveryLockHF3(async key=>{const r=await callTransportHF3('resumeOperationHF4',{id:entry.id,warehouseId:entry.warehouseId});const local=readPendingHF3(key);if(local&&local.id===r.clientOperationIdHF4)localStorage.removeItem(key);return r;});await finishRecoveryHF3({data:{warehouseId:entry.warehouseId}},result);}catch(e){const box=$('loginError');if(!$('app').hidden)fail(e);else{box.textContent=e.message;box.hidden=false;}renderRecoveryHF3();}finally{actionBusy=false;}
+}
+function openReconcileHF4(id){if(actionBusy||state.user?.role!=='ADMIN')return;const item=(state.receiptIncidents||[]).find(x=>x.INCIDENCIA_ID===id);if(!item)return;reconcileIncidentIdHF4=id;$('reconcileInfoHF4').textContent=id+' · referencia pedida '+(item.REFERENCIA_PEDIDA||'')+' · recibida '+(item.REFERENCIA_RECIBIDA||'');$('reconcileFormHF4').reset();$('reconcileDialogHF4').showModal();}
+$('reconcileCancelHF4').onclick=()=>$('reconcileDialogHF4').close();
+$('reconcileFormHF4').onsubmit=async e=>{e.preventDefault();if(actionBusy||state.user?.role!=='ADMIN')return;const quantity=Number($('reconcileQtyHF4').value),reason=$('reconcileReasonHF4').value.trim(),close=$('reconcileCloseHF4').checked;if(!Number.isFinite(quantity)||quantity<0||!reason||(!quantity&&!close)){status('Indica una cantidad válida o cierre documental y un motivo.','error');return;}if(!confirm('¿Registrar esta decisión comercial/documental? No modifica el inventario físico.'))return;actionBusy=true;try{await call('reconcileIncidentHF4',{incidentId:reconcileIncidentIdHF4,quantity,reason,close,acceptSubstitution:$('reconcileSubHF4').checked});$('reconcileDialogHF4').close();await afterSave('Conciliación administrativa registrada.','receipt');}catch(error){fail(error);}finally{actionBusy=false;}};
+$('historyLoadHF4').onclick=async()=>{const button=$('historyLoadHF4'),kind=$('historyKindHF4').value,warehouse=state.currentWarehouse?.id,epoch=warehouseEpoch;button.disabled=true;try{const offset=historyOffsetsHF4[warehouse+'|'+kind]??0;if(offset===null){$('historyStatusHF4').textContent='No quedan más páginas.';return;}const r=await call('historyPageHF4',{kind,offset,limit:100,warehouseId:warehouse});if(epoch!==warehouseEpoch||warehouse!==state.currentWarehouse?.id)return;historyOffsetsHF4[warehouse+'|'+kind]=r.nextOffset;$('historyStatusHF4').textContent='Registros '+(offset+1)+'–'+(offset+r.rows.length)+' de '+r.total+(r.nextOffset===null?' · fin del histórico':'');const list=document.createElement('ul');r.rows.forEach(row=>{const li=document.createElement('li');li.textContent=[row.FECHA||row.ACTUALIZADO||'',row.ID_EVENTO||row.ID_LOTE_MATERIAL||row.ID_SOLICITUD||row.INCIDENCIA_ID||row.ID_TRASPASO||row.ID||'',row.REFERENCIA||row.MATERIAL_ID||'',row.ESTADO||'',row.PROYECTO||row.PROYECTO_ORIGEN||'',row.CANTIDAD??row.CANTIDAD_INICIAL??''].filter(x=>x!=='').join(' · ');list.appendChild(li);});$('historyRowsHF4').replaceChildren(list);}catch(e){fail(e);}finally{button.disabled=false;}};
+$('historyKindHF4').onchange=()=>{$('historyRowsHF4').replaceChildren();$('historyStatusHF4').textContent='';};
+
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
 </body>
 </html>
