@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
-  <meta name="levitec-frontend-release" content="audit-hotfix-20261031.2">
+  <meta name="levitec-frontend-release" content="audit-hotfix-20261031.3">
   <title>LEVITEC Warehouse · Producción</title>
   
 <link rel="icon" href="./favicon.ico" sizes="any">
@@ -309,6 +309,7 @@
   <div><b id="userName"></b><span id="userRole"></span><small id="warehouseIdentity"></small></div>
 </div>
   </div></header>
+  <section id="recoveryHF3" class="line" style="max-width:1100px;margin:16px auto;padding:18px" role="status" aria-live="polite" hidden></section>
   <div id="login" class="login-wrap"><section class="card login-card"><p class="eyebrow">WAREHOUSE</p><h1>Gestión operativa de almacén</h1><p>Controla existencias, registra recepciones y gestiona los movimientos de material entre almacenes y obras.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
   <main id="app" class="layout" hidden>
     <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" onclick="refresh(true)" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
@@ -323,6 +324,7 @@
       <button class="tab write" type="button" data-view="receipt" onclick="view('receipt')">Nueva recepción</button>
     </nav>
     <div id="status" class="flash" role="status" aria-live="polite" hidden></div>
+    <section id="stockIssuesHF3" class="flash error" role="alert" hidden></section>
     <section id="stock">
       <div class="stats" aria-label="Resumen del almacén">
         <div class="stat"><span>Referencias</span><strong id="statReferences">0</strong><small>Materiales con existencias</small></div>
@@ -538,7 +540,7 @@
     const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     function status(message,type='success'){let el=$('status');el.textContent=message;el.className='flash '+type;el.hidden=!message}
     function fail(error){status(error.message||String(error),'error')}
-    function call(action,data={}){
+    function callTransportHF3(action,data={}){
       if(state.currentWarehouse?.id && action!=='bootstrap' && !Object.prototype.hasOwnProperty.call(data,'warehouseId')){
         data=Object.assign({},data,{warehouseId:state.currentWarehouse.id});
       }
@@ -548,8 +550,8 @@
       const finish=()=>{clearTimeout(timer);window.removeEventListener('message',onMessage);frame.remove();form.remove()};
       const onMessage=e=>{let origin;try{origin=new URL(e.origin)}catch{return}
         if(origin.protocol!=='https:'||!(origin.hostname==='script.google.com'||origin.hostname==='script.googleusercontent.com'||origin.hostname.endsWith('-script.googleusercontent.com')))return;
-        const p=e.data;if(!p||p.source!=='ALMACEN_OBRA'||p.requestId!==requestId)return;
-        finish();p.ok?resolve(p.result):reject(Error(p.message||'Error del servidor'))};
+        const p=e.data;if(!p||p.source!=='ALMACEN_OBRA'||p.requestId!==requestId||typeof p.ok!=='boolean'||!messageFromRequestFrameHF3(e.source,frame))return;
+        finish();if(p.ok)resolve(p.result);else{const err=Error(p.message||'Error del servidor');err.operationUnstarted=p.operationUnstarted===true;reject(err);}};
       const timer=setTimeout(()=>{finish();reject(Error('No hay respuesta del servidor. Comprueba la conexión antes de repetir la operación.'))},30000);
       window.addEventListener('message',onMessage);
       Object.entries({requestId,action,credential,data:JSON.stringify(data)}).forEach(([key,value])=>{let i=document.createElement('input');i.type='hidden';i.name=key;i.value=value;form.appendChild(i)});
@@ -570,7 +572,7 @@
       else $('imputationHint').textContent=code?'Código sin regla activa. Selecciona el proyecto manualmente.':'Si existe una regla configurada, seleccionará automáticamente el proyecto.'}
     function physicalMaterials(origin){let groups=new Map();availableStock().filter(x=>x.zone===origin).forEach(x=>{let g=groups.get(x.materialId)||{materialId:x.materialId,description:x.description,reference:x.reference,unit:x.unit,quantity:0,projects:{}};g.quantity+=Number(x.quantity);g.projects[x.project]=(g.projects[x.project]||0)+Number(x.quantity);groups.set(x.materialId,g)});return [...groups.values()].map(g=>({...g,quantity:Math.round(g.quantity*1000)/1000}))}
     function pendingEvents(){return(state.movements||[]).filter(x=>x.TIPO==='MOVIMIENTO'&&x.ESTADO==='PENDIENTE'&&destinationNeedsValidation(x.DESTINO))}
-    function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0)}
+    function availableStock(){return(state.stock||[]).filter(x=>x.area==='ALMACEN'&&Number(x.quantity)>0&&!x.balanceBlocked)}
     function quarantineStock(){return(state.stock||[]).filter(x=>x.area==='CUARENTENA'&&Number(x.quantity)>0)}
     function receiptZoneHint(){let any=[...document.querySelectorAll('#receiptLines .line')].some(line=>Number(value(line,'quarantineQty')||0)>0);$('receiptQuarantineHint').hidden=!any}
     function isQuarantine(code){return state.zones?.some(z=>z.CODIGO===code&&z.AREA==='CUARENTENA')}
@@ -590,14 +592,14 @@
       actionBusy=true;pendingRelease=pendingRelease||'op_'+crypto.randomUUID();status('Registrando la resolución de cuarentena…','info');
       try{await call('resolveQuarantine',{batchId:pendingRelease,action,project:x.project,origin:x.zone,destination,materialId:x.materialId,materialLotId,quantity,reason});pendingRelease='';await afterSave('Resolución de cuarentena registrada con trazabilidad.','quality')}catch(e){fail(e)}finally{actionBusy=false}}
     function filteredStock(){let q=normalize($('search').value),p=$('stockProject').value,z=$('stockZone').value;
-      return (($('stockScope')?.value==='GLOBAL')?(state.globalStock||[]):availableStock()).filter(x=>(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
+      return (($('stockScope')?.value==='GLOBAL')?(state.globalStock||[]):availableStock()).filter(x=>!x.balanceBlocked&&(!p||x.project===p)&&(!z||x.zone===z)&&normalize([x.description,x.reference,x.project,x.zone].join(' ')).includes(q))}
     function zoneLabel(code){let z=(state.zones||[]).find(x=>x.CODIGO===code);if(!z)return code;let wh=state.currentWarehouse?.id||'';let m=wh.match(/-N(\d+)$/);return (m?'N'+m[1]+' - ':'')+(z.NOMBRE||code)}
     async function loadStockScope(){
       if($('stockScope').value==='GLOBAL'){
-        try{status('Consultando inventario global…','info');const r=await call('globalStock',{});state.globalStock=r.stock||[];status('Inventario global actualizado.','success')}
+        try{status('Consultando inventario global…','info');const r=await call('globalStock',{});state.globalStock=r.stock||[];state.globalStockIssuesHF3=r.stockIssuesHF3||[];renderStockIssuesHF3();status('Inventario global actualizado.','success')}
         catch(e){fail(e);$('stockScope').value='LOCAL';}
       }
-      renderStock();
+      renderStock();renderStockIssuesHF3();
     }
     const expandedStockRC13=new Set();
     function stockPositionRC13(x){
@@ -1092,7 +1094,7 @@
       return{batchId:pendingMove||'op_'+crypto.randomUUID(),project,origin,destination,note:$('mNote').value.trim(),lines:[{materialId:id,quantity,materialLotId:''}]}}
     let v118RefreshSerial=0;
     async function refresh(manual=false){const requestedWarehouse=state.currentWarehouse?.id,epoch=warehouseEpoch,requestSerial=++v118RefreshSerial;if(manual)status('Actualizando datos…','info');
-      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.quarantineLotsHF2=r.quarantineLotsHF2||[];if($('stockScope')?.value==='GLOBAL')loadStockScope();state.apiVersion=r.apiVersion||state.apiVersion;state.movements=r.movements||[];state.internalMovementsRC12=r.internalMovementsRC12||[];state.availableStockRC12=r.availableStockRC12||[];if(r.availableStockRC12&&$('lOrigin').value===requestedWarehouse){const old=logisticsCatalogState.stock||[];logisticsCatalogState.stock=r.availableStockRC12.map(x=>({...old.find(o=>o.materialId===x.materialId&&o.ownerProject===x.ownerProject&&o.zone===x.zone),...x}));logisticsMaterialChoices();}state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
+      try{let r=await call('getStock',{warehouseId:requestedWarehouse});if(epoch!==warehouseEpoch||requestSerial!==v118RefreshSerial||r.currentWarehouse?.id!==requestedWarehouse)return;state.stock=r.stock;state.stockIssuesHF3=r.stockIssuesHF3||[];renderStockIssuesHF3();state.quarantineLotsHF2=r.quarantineLotsHF2||[];if($('stockScope')?.value==='GLOBAL')loadStockScope();state.apiVersion=r.apiVersion||state.apiVersion;state.movements=r.movements||[];state.internalMovementsRC12=r.internalMovementsRC12||[];state.availableStockRC12=r.availableStockRC12||[];if(r.availableStockRC12&&$('lOrigin').value===requestedWarehouse){const old=logisticsCatalogState.stock||[];logisticsCatalogState.stock=r.availableStockRC12.map(x=>({...old.find(o=>o.materialId===x.materialId&&o.ownerProject===x.ownerProject&&o.zone===x.zone),...x}));logisticsMaterialChoices();}state.zones=r.zones||state.zones;state.materials=r.materials||state.materials;state.zoneMap=r.zoneMap||state.zoneMap||[];state.projectRules=r.projectRules||state.projectRules||[];state.transfers=r.transfers||[];state.lots=r.lots||state.lots||[];state.materialPolicies=r.materialPolicies||[];state.transferRequests=r.transferRequests||[];state.siteMaterialRequests=r.siteMaterialRequests||[];state.siteOrders=r.siteOrders||[];state.receiptIncidents=r.receiptIncidents||[];state.logistics=r.logistics||[];renderLogistics();renderSiteOrderSelector();renderReceiptIncidents();state.currentWarehouse=r.currentWarehouse||state.currentWarehouse;state.zoneMapSupported=Array.isArray(r.zoneMap);
         setChoices('rZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');receiptZoneHint();setChoices('mOrigin',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE');setChoices('mDestination',state.zones,'CODIGO','NOMBRE');
         setChoices('stockProject',state.projects,'CODIGO','CODIGO','Todos');setChoices('stockZone',state.zones.filter(z=>z.AREA==='ALMACEN'),'CODIGO','NOMBRE','Todas');
         const errors=[];[['Resumen',renderSummary],['Existencias',renderStock],['Operaciones',renderLogistics],['Movimientos',renderMoves],['Traspasos',renderTransfers],['Plano',renderMap],['Cuarentena',renderQuality],['Formulario',available],['Proyecto',applyProjectRule],['Recepción',updateReceiptSuggestions]].forEach(([name,fn])=>{try{fn();}catch(e){errors.push(name+': '+e.message);}});if(errors.length)throw Error(errors.join(' · '));if(manual){if(!r.availableStockRC12||$('lOrigin').value!==requestedWarehouse)await logisticsChoices();status('Existencias e historial actualizados.');}}
@@ -1449,6 +1451,7 @@
     function v116Clear(){sessionStorage.removeItem(V116_PENDING_KEY)}
     function v116UnlockUi(){const btn=$('lSubmit');if(btn){btn.disabled=false;btn.textContent='Crear operación con los materiales añadidos'}}
     async function v116CheckPending(){
+      if(readPendingHF3()){renderRecoveryHF3();status('Hay una operación guardada pendiente. Reanúdala desde el aviso de recuperación.','error');return false;}
       const op=v116Pending();if(!op)return true;
       status('Verificando la última operación '+op.id+' antes de permitir otro envío…','info');
       try{
@@ -1479,10 +1482,7 @@
         let r;
         try{r=await call('submitOperationRC12',data);}
         catch(e){
-          let checked;try{checked=await call('operationStatusV116',{clientId:data.clientId});}
-          catch(checkError){throw Error('Resultado sin confirmar para '+data.clientId+'. No repitas la operación. Pulsa Actualizar y comprueba Seguimiento.');}
-          if(!checked.exists){v116Clear();throw e;}
-          r={id:checked.id,status:checked.status,needsReview:true};
+          throw e; // El intento completo sigue guardado; una fila aislada no confirma toda la operación.
         }
         acknowledged=true;v116Clear();pendingLogisticsClientId='';logisticsCart=[];renderLogisticsCart();$('lNote').value='';
         logisticsCatalogState.stock=[];logisticsMaterialChoices();
@@ -1562,13 +1562,15 @@
     }
 
     async function signedIn(result){
-      resetReceiptCatalogRC14();credential=result.credential;
+      resetReceiptCatalogRC14();credential=result.credential;serverPendingHF3=[];renderRecoveryHF3();
+      try{serverPendingHF3=(await callTransportHF3('pendingReceiptsHF3',{})).receipts||[];}catch(_){}
+      renderRecoveryHF3();
       $('loginError').hidden=true;
 
       try{
-        const initialWarehouse=deepLinkParams.get('warehouseId');
+        const initialWarehouse=recoveryWarehouseHF3||deepLinkParams.get('warehouseId');recoveryWarehouseHF3='';
         state=await call('bootstrap',initialWarehouse?{warehouseId:initialWarehouse}:{});
-        rememberReceiptCatalogRC14(state.receiptDestinationsRC14);
+        rememberReceiptCatalogRC14(state.receiptDestinationsRC14);renderStockIssuesHF3();
 
         state.projectRules=state.projectRules||[];
         state.transfers=state.transfers||[];
@@ -1719,6 +1721,102 @@
         try{google.accounts.id.prompt();}catch(e){console.warn('Google silent sign-in unavailable',e);}
       }
     }
+  </script>
+  <script>
+const RECOVERY_ACTIONS_HF3=new Set(['createReceipt','moveStock','resolveQuarantine','submitOperationRC12','requestProtectedTransfer']);
+let serverPendingHF3=[],recoveryWarehouseHF3='';
+function recoveryOwnerHF3(){
+  if(!credential)return '';
+  try{const part=credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return String(JSON.parse(atob(part)).sub||'');}catch(_){return '';}
+}
+function recoveryKeyHF3(){const owner=recoveryOwnerHF3();return owner?'levitec_warehouse_recovery_hf3:'+CLIENT_ID+':'+owner:'';}
+function cleanIntentHF3(value){
+  if(Array.isArray(value))return value.map(cleanIntentHF3);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!['credential','token','idtoken','accesstoken','authorization'].includes(k.toLowerCase())).map(([k,v])=>[k,cleanIntentHF3(v)]));
+  return value;
+}
+function stableIntentHF3(value){return JSON.stringify(value&&typeof value==='object'?(Array.isArray(value)?value.map(v=>JSON.parse(stableIntentHF3(v))):Object.fromEntries(Object.keys(value).filter(k=>value[k]!==undefined).sort().map(k=>[k,JSON.parse(stableIntentHF3(value[k]))]))):value);}
+function readPendingHF3(key=recoveryKeyHF3()){
+  if(!key)return null;let raw;
+  try{raw=localStorage.getItem(key);}catch(_){throw Error('No se puede guardar la recuperación en este navegador. No se ha enviado una operación nueva.');}
+  if(!raw)return null;let record;try{record=JSON.parse(raw);}catch(_){throw Error('El registro local de recuperación no se puede leer. Debe revisarse antes de otro envío.');}
+  if(record.version!==1||!RECOVERY_ACTIONS_HF3.has(record.action)||!record.data||record.owner!==key||record.id!==(record.data.batchId||record.data.clientId))throw Error('El registro de recuperación es incompatible. No se ha enviado otra operación.');
+  return record;
+}
+function writePendingHF3(key,record){
+  try{localStorage.setItem(key,JSON.stringify(record));if(localStorage.getItem(key)!==JSON.stringify(record))throw Error();}catch(_){throw Error('No se ha podido guardar el intento para recuperarlo. No se ha enviado una operación nueva.');}
+}
+function withRecoveryLockHF3(task){
+  const key=recoveryKeyHF3();if(!key)return Promise.reject(Error('Inicia sesión antes de registrar una operación.'));
+  if(!navigator.locks?.request)return Promise.reject(Error('Este navegador no permite proteger los envíos entre pestañas. Abre Warehouse en Chrome o Edge actualizado.'));
+  return navigator.locks.request(key,async()=>{if(recoveryKeyHF3()!==key)throw Error('La cuenta ha cambiado. Vuelve a iniciar la operación.');return task(key);});
+}
+async function executeSavedHF3(key,record){
+  try{
+    const result=await callTransportHF3(record.action,record.data);
+    if(result?.warning){record.lastMessage=result.warning;writePendingHF3(key,record);}else localStorage.removeItem(key);
+    renderRecoveryHF3();return result;
+  }catch(e){
+    if(e.operationUnstarted===true)localStorage.removeItem(key);
+    renderRecoveryHF3();throw e;
+  }
+}
+function call(action,data={}){
+  if(!RECOVERY_ACTIONS_HF3.has(action))return callTransportHF3(action,data);
+  const payload=cleanIntentHF3({...data,warehouseId:data.warehouseId||state.currentWarehouse?.id});
+  return withRecoveryLockHF3(async key=>{
+    let record=readPendingHF3(key);const id=String(payload.batchId||payload.clientId||'');
+    if(!/^[a-zA-Z0-9_-]{8,100}$/.test(id))throw Error('No se ha podido identificar la operación. No se ha enviado.');
+    if(record){if(record.action!==action||stableIntentHF3(record.data)!==stableIntentHF3(payload))throw Error('Hay otro intento pendiente. Reanuda la operación guardada antes de registrar una distinta.');}
+    else{record={version:1,owner:key,id,action,data:payload,createdAt:Date.now()};writePendingHF3(key,record);}
+    renderRecoveryHF3();return executeSavedHF3(key,record);
+  });
+}
+function messageFromRequestFrameHF3(source,frame){
+  for(let depth=0;source&&depth<8;depth++){
+    if(source===frame.contentWindow)return true;
+    try{const parent=source.parent;if(parent===source)return false;source=parent;}catch(_){return false;}
+  }return false;
+}
+function renderRecoveryHF3(){
+  const box=document.getElementById('recoveryHF3');if(!box)return;
+  if(!credential){box.hidden=true;return;}
+  let record;try{record=readPendingHF3();}catch(e){box.hidden=false;box.textContent=e.message;return;}
+  const labels={createReceipt:'recepción',moveStock:'movimiento',resolveQuarantine:'resolución de cuarentena',submitOperationRC12:'operación logística',requestProtectedTransfer:'solicitud de autorización'};
+  box.hidden=!record&&!serverPendingHF3.length;if(box.hidden){box.replaceChildren();return;}
+  box.innerHTML='<h2>Operación pendiente de confirmar</h2><p>Reanuda el mismo envío guardado antes de registrar otra operación. No se creará un identificador nuevo.</p>'+
+    (record?'<p><strong>'+esc(labels[record.action])+'</strong> · '+esc(record.data.warehouseId||'')+'<br><small>Código: '+esc(record.id)+'</small></p>'+(record.lastMessage?'<p>'+esc(record.lastMessage)+'</p>':'')+'<button class="button" type="button" id="resumeLocalHF3">Reintentar envío guardado</button>':'')+
+    serverPendingHF3.map((r,i)=>'<div class="spacer"><p>Recepción sin completar en '+esc(r.warehouseId)+'<br><small>'+esc(r.batchId)+'</small></p>'+(r.recoverable?'<button class="button secondary" type="button" data-resume-server="'+i+'">Completar recepción guardada</button>':'<p>El plan está incompleto y requiere conciliación antes de continuar.</p>')+'</div>').join('');
+  const local=document.getElementById('resumeLocalHF3');if(local)local.onclick=resumeLocalHF3;
+  box.querySelectorAll('[data-resume-server]').forEach(button=>button.onclick=()=>resumeServerHF3(Number(button.dataset.resumeServer)));
+}
+async function finishRecoveryHF3(record,result){
+  if(result?.warning){status('La operación sigue pendiente: '+result.warning,'error');return;}
+  pendingReceipt='';pendingMove='';pendingRelease='';pendingLogisticsClientId='';v116Clear();
+  recoveryWarehouseHF3=record.data.warehouseId||'';await signedIn({credential});
+  if(result?.labels?.length){showReceiptLabels(result.labels,result.batchId);view('receipt',false);}
+  status('Operación guardada confirmada. No se ha repetido el movimiento de stock.','success');
+}
+async function resumeLocalHF3(){
+  if(actionBusy||receiptSaving||moveSaving)return;let record;
+  try{record=readPendingHF3();if(!record)return;const result=await withRecoveryLockHF3(async key=>{const current=readPendingHF3(key);if(!current)throw Error('Otra pestaña ya ha resuelto este intento. Actualiza la pantalla.');if(!confirm('¿Reanudar el envío guardado '+current.id+' en '+current.data.warehouseId+'?'))return null;actionBusy=true;return executeSavedHF3(key,current);});if(result)await finishRecoveryHF3(record,result);}
+  catch(e){if(!document.getElementById('app').hidden)fail(e);else{document.getElementById('loginError').textContent=e.message;document.getElementById('loginError').hidden=false;}renderRecoveryHF3();}
+  finally{actionBusy=false;}
+}
+async function resumeServerHF3(index){
+  if(actionBusy||receiptSaving||moveSaving)return;const entry=serverPendingHF3[index];if(!entry||!confirm('¿Completar la recepción guardada '+entry.batchId+' en '+entry.warehouseId+'?'))return;
+  actionBusy=true;
+  try{const result=await withRecoveryLockHF3(async key=>{const r=await callTransportHF3('resumeReceiptHF3',{batchId:entry.batchId,warehouseId:entry.warehouseId});const local=readPendingHF3(key);if(local?.id===entry.batchId)localStorage.removeItem(key);return r;});await finishRecoveryHF3({data:{warehouseId:entry.warehouseId}},result);}
+  catch(e){if(!document.getElementById('app').hidden)fail(e);else{document.getElementById('loginError').textContent=e.message;document.getElementById('loginError').hidden=false;}renderRecoveryHF3();}finally{actionBusy=false;}
+}
+function renderStockIssuesHF3(){
+  const box=document.getElementById('stockIssuesHF3');if(!box)return;const global=document.getElementById('stockScope')?.value==='GLOBAL';
+  const rows=(global?state.globalStockIssuesHF3:state.stockIssuesHF3)||[];box.hidden=!rows.length;
+  if(rows.length)box.innerHTML='<strong>Existencias pendientes de conciliación</strong><p>Estos saldos negativos no se ocultan. El material y la ubicación afectados quedan bloqueados para operar.</p><ul>'+rows.map(r=>'<li>'+esc(r.warehouseId)+' · '+esc(r.zone)+' · '+esc(r.reference)+' · '+esc(r.project)+': '+esc(r.quantity)+' '+esc(r.unit)+' (saldo físico neto: '+esc(r.physicalNet)+')</li>').join('')+'</ul>';
+  else box.replaceChildren();
+}
+window.addEventListener('storage',e=>{if(e.key===recoveryKeyHF3())renderRecoveryHF3();});
+
   </script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
