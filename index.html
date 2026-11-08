@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-DJX5Tg8gXIOM4uROHXcNCu5yFTpks+V5gyuqz/0UzXg=' 'sha256-ihwymJXpIMbYK3nWrkC/41GRiUXzv8NZyr0KPDqrZV8=' 'sha256-yyUuXx7zIZg31u7FKTHmGv1fee/RSAnbLcMcmju2QpY=' 'sha256-iMF49XLtRBeZAutE+pv+ALrW6I6m/MLYPsZdJGXKwy8=' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-elem 'self' 'sha256-DJX5Tg8gXIOM4uROHXcNCu5yFTpks+V5gyuqz/0UzXg=' 'sha256-ihwymJXpIMbYK3nWrkC/41GRiUXzv8NZyr0KPDqrZV8=' 'sha256-yyUuXx7zIZg31u7FKTHmGv1fee/RSAnbLcMcmju2QpY=' 'sha256-iMF49XLtRBeZAutE+pv+ALrW6I6m/MLYPsZdJGXKwy8=' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://quickchart.io https://*.googleusercontent.com; connect-src 'self' https://accounts.google.com https://*.googleapis.com; frame-src https://accounts.google.com https://script.google.com https://*.googleusercontent.com; form-action https://script.google.com https://*.googleusercontent.com; object-src 'none'; base-uri 'none'; worker-src 'self' blob:; media-src 'self' blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-zlz264r+tnQFSm1Sq+Eu0GOY15BqFb3Q6dOTsha9008=' 'sha256-ihwymJXpIMbYK3nWrkC/41GRiUXzv8NZyr0KPDqrZV8=' 'sha256-yyUuXx7zIZg31u7FKTHmGv1fee/RSAnbLcMcmju2QpY=' 'sha256-iMF49XLtRBeZAutE+pv+ALrW6I6m/MLYPsZdJGXKwy8=' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-elem 'self' 'sha256-zlz264r+tnQFSm1Sq+Eu0GOY15BqFb3Q6dOTsha9008=' 'sha256-ihwymJXpIMbYK3nWrkC/41GRiUXzv8NZyr0KPDqrZV8=' 'sha256-yyUuXx7zIZg31u7FKTHmGv1fee/RSAnbLcMcmju2QpY=' 'sha256-iMF49XLtRBeZAutE+pv+ALrW6I6m/MLYPsZdJGXKwy8=' https://accounts.google.com/gsi/client https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://quickchart.io https://*.googleusercontent.com; connect-src 'self' https://accounts.google.com https://*.googleapis.com; frame-src https://accounts.google.com https://script.google.com https://*.googleusercontent.com; form-action https://script.google.com https://*.googleusercontent.com; object-src 'none'; base-uri 'none'; worker-src 'self' blob:; media-src 'self' blob:">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
@@ -312,7 +312,7 @@
 </div>
   </div></header>
   <section id="recoveryHF3" class="line" style="max-width:1100px;margin:16px auto;padding:18px" role="status" aria-live="polite" hidden></section>
-  <div id="login" class="login-wrap"><section class="card login-card"><p class="eyebrow">WAREHOUSE</p><h1>Gestión operativa de almacén</h1><p>Controla existencias, registra recepciones y gestiona los movimientos de material entre almacenes y obras.</p><div id="signin"></div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
+  <div id="login" class="login-wrap"><section class="card login-card"><p class="eyebrow">WAREHOUSE</p><h1>Gestión operativa de almacén</h1><p>Controla existencias, registra recepciones y gestiona los movimientos de material entre almacenes y obras.</p><div id="signin"></div><div id="loginProgress" class="flash" role="status" aria-live="polite" hidden>Iniciando sesión en Warehouse…</div><div id="loginError" class="flash error" role="alert" hidden></div></section></div>
   <main id="app" class="layout" hidden>
     <div class="pagehead"><div><p class="eyebrow">Gestión de materiales</p><h1 id="pageTitle">Existencias</h1><p id="pageIntro" class="intro">Material disponible por proyecto y ubicación.</p></div><button class="button secondary" type="button" data-ui-click="a002" aria-label="Actualizar datos">↻ &nbsp;Actualizar</button></div>
     <nav class="tabs" aria-label="Secciones">
@@ -1566,14 +1566,19 @@
       actionBusy=true;try{await call(action,data);await afterSave('Operación logística actualizada.','logistics')}catch(e){fail(e)}finally{actionBusy=false}
     }
 
+    let warehouseSigningIn=false;
     async function signedIn(result){
-      resetReceiptCatalogRC14();credential=result.credential;serverPendingHF3=[];serverOperationsHF4=[];renderRecoveryHF3();
-      try{serverPendingHF3=(await callTransportHF3('pendingReceiptsHF3',{})).receipts||[];}catch(_){}
-      try{serverOperationsHF4=(await callTransportHF3('pendingOperationsHF4',{})).operations||[];}catch(_){}
-      renderRecoveryHF3();
-      $('loginError').hidden=true;
-
+      if(warehouseSigningIn)return;
+      warehouseSigningIn=true;
+      const isLogin=!$('login').hidden;
+      if(isLogin){
+        $('loginError').hidden=true;
+        $('signin').hidden=true;
+        $('loginProgress').hidden=false;
+      }
       try{
+        resetReceiptCatalogRC14();credential=result.credential;
+        serverPendingHF3=[];serverOperationsHF4=[];renderRecoveryHF3();
         const initialWarehouse=recoveryWarehouseHF3||deepLinkParams.get('warehouseId');recoveryWarehouseHF3='';
         state=await call('bootstrap',initialWarehouse?{warehouseId:initialWarehouse}:{});
         rememberReceiptCatalogRC14(state.receiptDestinationsRC14);renderStockIssuesHF3();
@@ -1591,10 +1596,6 @@
         state.zoneMap=state.zoneMap||[];
 
         let backendMismatch=state.apiVersion&&!['1.20-rc12','1.20-rc14'].includes(state.apiVersion);
-
-        $('login').hidden=true;
-        $('app').hidden=false;
-        $('identity').hidden=false;
 
         document.querySelector('[data-view="quality"]').hidden=!state.quarantineSupported;
         $('zoneUseField').hidden=!state.quarantineSupported;
@@ -1616,7 +1617,17 @@
         // Conserva la lectura de stock del flujo instalado hasta verificar el backend real.
         await refresh();
         view(pendingDeepLinkOrder&&state.canReceive?'receipt':'stock',false);
+        $('login').hidden=true;
+        $('app').hidden=false;
+        $('identity').hidden=false;
         await locateDeepLinkWarehouse();
+        const loginCredential=credential;
+        Promise.allSettled([callTransportHF3('pendingReceiptsHF3',{}),callTransportHF3('pendingOperationsHF4',{})]).then(([receipts,operations])=>{
+          if(credential!==loginCredential)return;
+          if(receipts.status==='fulfilled')serverPendingHF3=receipts.value.receipts||[];
+          if(operations.status==='fulfilled')serverOperationsHF4=operations.value.operations||[];
+          renderRecoveryHF3();
+        });
 
         if(!state.apiVersion||backendMismatch){
           status('La versión del backend no coincide con la de Warehouse Producción. Verifica la implementación de Apps Script.','info');
@@ -1627,6 +1638,10 @@
         $('identity').hidden=true;
         $('loginError').textContent=e.message;
         $('loginError').hidden=false;
+      }finally{
+        warehouseSigningIn=false;
+        $('loginProgress').hidden=true;
+        $('signin').hidden=false;
       }
     }
 
