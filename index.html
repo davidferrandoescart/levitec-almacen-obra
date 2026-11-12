@@ -923,9 +923,23 @@
       d.innerHTML='<div class="line-title"><h3>Línea <span class="line-number"></span></h3><button type="button" class="button ghost small" data-ui-click="a082">Quitar</button></div><div class="line-grid"><label class="field order-reference-field" hidden><span>Referencia solicitada (Site Control)</span><input class="order-reference" readonly tabindex="-1"></label><label class="field"><span>Referencia física recibida *</span><input class="reference" placeholder="Referencia inequívoca" maxlength="80" data-ui-input="a083"><small class="material-state"></small></label><label class="field"><span>Descripción *</span><input class="description" placeholder="Se autocompleta si la referencia existe" maxlength="200" data-ui-input="a084"></label><label class="field"><span>Fabricante</span><input class="manufacturer" maxlength="100"></label><label class="field"><span>Unidad *</span><select class="unit" data-ui-change="a085"><option>ud</option><option>m</option><option>kg</option><option>l</option><option>rollo</option><option>caja</option></select></label><label class="field"><span>Cantidad en albarán *</span><input class="albaranQty" type="number" inputmode="decimal" step="0.001" min="0.001" data-ui-input="a086"></label><label class="field"><span>Recibida físicamente *</span><input class="receivedQty" type="number" inputmode="decimal" step="0.001" min="0" data-ui-input="a086"></label><label class="field"><span>A cuarentena</span><input class="quarantineQty" type="number" inputmode="decimal" step="0.001" min="0" value="0" data-ui-input="a086"></label><label class="field per-line-feature"><span>Ubicación conforme</span><select class="line-zone" data-ui-change="a085"><option value="">Zona conforme por defecto</option></select></label><label class="field per-line-feature"><span>Categoría</span><input class="category" maxlength="80" placeholder="Ej. equipos HVAC" data-ui-change="a087"></label></div><div class="quarantine-fields" hidden><label class="field"><span>Zona de cuarentena *</span><select class="quarantine-zone"></select></label><label class="field"><span>Motivo *</span><select class="quarantine-reason"><option value="">Selecciona motivo</option><option>Dañado / roto</option><option>Defecto aparente</option><option>Material incorrecto</option><option>Documentación pendiente</option><option>Pendiente inspección de Calidad</option><option>Otro</option></select></label><label class="field"><span>Detalle</span><input class="incident" maxlength="250" placeholder="Daño observado, falta documental, referencia incorrecta…"></label></div><div class="receipt-result">Introduce cantidades de albarán y recepción física.</div><p class="count receipt-incident-note" aria-live="polite"></p><p class="count zone-suggestion" aria-live="polite"></p>';
       d.querySelectorAll('.per-line-feature,.zone-suggestion').forEach(el=>el.hidden=!state.perLineZonesSupported);$('receiptLines').append(d);fillLineZones(d);numberLines();updateReceiptSuggestions()}
     function normalizedReference(v){return String(v||'').trim().toUpperCase()}
-    function materialReferenceChanged(input){input.value=input.value.toUpperCase();let line=input.closest('.line'),ref=normalizedReference(input.value),material=(state.materials||[]).find(m=>normalizedReference(m.REFERENCIA)===ref),desc=line.querySelector('.description'),unit=line.querySelector('.unit'),maker=line.querySelector('.manufacturer'),cat=line.querySelector('.category'),hint=line.querySelector('.material-state');
-      if(material){desc.value=material.DESCRIPCION||'';desc.readOnly=true;unit.value=material.UNIDAD||'ud';unit.disabled=true;maker.value=material.FABRICANTE||'';maker.readOnly=true;cat.value=material.CATEGORIA||'';hint.textContent='Material existente · datos maestros autocompletados.'}
-      else{desc.readOnly=false;unit.disabled=false;maker.readOnly=false;hint.textContent=ref?'Referencia nueva · completa descripción y unidad.':''}updateReceiptSuggestions()}
+    function materialReferenceChanged(input){
+      input.value=input.value.toUpperCase();
+      const line=input.closest('.line'),ref=normalizedReference(input.value),desc=line.querySelector('.description'),unit=line.querySelector('.unit'),maker=line.querySelector('.manufacturer'),cat=line.querySelector('.category'),hint=line.querySelector('.material-state');
+      const variants=(state.materials||[]).filter(m=>normalizedReference(m.REFERENCIA)===ref&&String(m.ACTIVO||'SI').toUpperCase()==='SI');
+      const normalizedDesc=v=>String(v||'').trim().replace(/\s+/g,' ').toUpperCase();
+      const exact=variants.filter(m=>normalizedDesc(m.DESCRIPCION)===normalizedDesc(desc.value)&&String(m.UNIDAD||'').trim().toUpperCase()===String(unit.value||'').trim().toUpperCase());
+      // En pedidos, la descripción técnica de la línea prevalece sobre cualquier otra variante del catálogo.
+      if(exact.length===1){
+        const material=exact[0];desc.value=material.DESCRIPCION||desc.value;unit.value=material.UNIDAD||unit.value;maker.value=material.FABRICANTE||'';cat.value=material.CATEGORIA||'';
+        desc.readOnly=!!line.dataset.siteLineId;unit.disabled=!!line.dataset.siteLineId;maker.readOnly=false;
+        hint.textContent='Variante técnica existente · '+material.ID;
+      }else{
+        desc.readOnly=false;unit.disabled=false;maker.readOnly=false;
+        hint.textContent=variants.length?'Referencia compartida por '+variants.length+' variante(s): conserva la descripción técnica exacta (SDR) y la unidad.':ref?'Referencia nueva · completa descripción y unidad.':'';
+      }
+      updateReceiptSuggestions();
+    }
     function fillLineZones(line){let select=line.querySelector('.line-zone'),selected=select?.value||'';if(select){select.replaceChildren(new Option('Zona conforme por defecto',''));(state.zones||[]).filter(z=>z.AREA==='ALMACEN').forEach(z=>select.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));select.value=selected}
       let q=line.querySelector('.quarantine-zone'),qSelected=q?.value||'';if(q){q.replaceChildren();(state.zones||[]).filter(z=>z.AREA==='CUARENTENA').forEach(z=>q.add(new Option((z.NOMBRE||z.CODIGO)+' · '+z.CODIGO,z.CODIGO)));if(qSelected&&[...q.options].some(o=>o.value===qSelected))q.value=qSelected}}
     function updateReceiptLine(line){
@@ -1175,7 +1189,7 @@
 
     function materialQrSummaryLocally(code){
       let reference=normalizedReference(String(code||'').replace(/^CELLARIQ:MAT:/i,'')),matches=(state.materials||[]).filter(m=>normalizedReference(m.REFERENCIA)===reference);
-      if(matches.length!==1)throw Error(matches.length?'La referencia está duplicada en el catálogo.':'QR / referencia no reconocida.');
+      if(matches.length!==1)throw Error(matches.length?'Esta referencia corresponde a varias variantes técnicas (por ejemplo, SDR). Escanea el QR de lote o selecciona el material por su descripción e ID.':'QR / referencia no reconocida.');
       let material=matches[0],stock=(state.stock||[]).filter(x=>x.materialId===material.ID&&Number(x.quantity)>0);
       return {material,stock};
     }
@@ -1185,6 +1199,7 @@
       const row=(lastVisibleStock||[]).find(x=>String(x.materialId||x.reference||'')===String(materialKey));
       if(!row){status('No se encuentra el material en las existencias visibles. Actualiza y vuelve a intentarlo.','error');return}
       const reference=String(row.reference||'').trim();
+      if((state.materials||[]).filter(m=>normalizedReference(m.REFERENCIA)===normalizedReference(reference)&&String(m.ACTIVO||'SI').toUpperCase()==='SI').length>1){status('Referencia compartida por varias variantes técnicas: utiliza la etiqueta de lote para identificar inequívocamente este material.','error');return;}
       if(!reference){status('El material no tiene referencia; no es posible generar su QR.','error');return}
       printLabels([{type:'MATERIAL',reference,description:String(row.description||''),manufacturer:String(row.manufacturer||'')}]);
     }
